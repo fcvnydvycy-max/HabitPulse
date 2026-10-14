@@ -1,0 +1,3027 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HabitPulse · Panel de Seguimiento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .ios-blur-bar {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .dark .ios-blur-bar {
+            background: rgba(22, 22, 24, 0.82);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .ios-card {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .dark .ios-card {
+            background: rgba(30, 30, 35, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        @keyframes slideUpSheet {
+            from { transform: translateY(100%); opacity: 0.4; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .ios-sheet-enter {
+            animation: slideUpSheet 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+        }
+
+        @keyframes iosShake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        .animate-shake {
+            animation: iosShake 0.4s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-[#f2f2f7] dark:bg-black text-slate-900 dark:text-slate-100 min-h-screen pb-28 transition-colors duration-300">
+
+    <div id="toast-container" class="fixed top-3 left-1/2 -translate-x-1/2 z-[150] flex flex-col items-center gap-2 pointer-events-none w-full max-w-sm px-4"></div>
+
+    <div id="lock-screen-overlay" class="fixed inset-0 z-[120] bg-[#f2f2f7] dark:bg-black flex items-center justify-center p-4 overflow-y-auto">
+        <div class="ios-card w-full max-w-md rounded-3xl p-6 sm:p-7 border border-slate-200/80 dark:border-white/15 shadow-2xl space-y-5 my-auto">
+            <div class="text-center space-y-1.5">
+                <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-3xl font-black mx-auto shadow-xl shadow-indigo-500/30">
+                    🔥
+                </div>
+                <h1 class="text-2xl font-black tracking-tight mt-2">HabitPulse</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Introduce tus credenciales para acceder a tu panel
+                </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-200/70 dark:bg-white/10 text-xs font-extrabold">
+                <button type="button" onclick="switchLockScreenTab('login')" id="lock-tab-login" class="py-2.5 rounded-xl bg-indigo-600 text-white shadow transition">
+                    🔑 Iniciar Sesión
+                </button>
+                <button type="button" onclick="switchLockScreenTab('register')" id="lock-tab-register" class="py-2.5 rounded-xl text-slate-500 dark:text-slate-300 transition">
+                    ✨ Crear Cuenta
+                </button>
+            </div>
+
+            <div id="lock-error-box" class="hidden p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-500 text-xs font-extrabold flex items-center gap-2.5">
+                <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                <span id="lock-error-text">Usuario o contraseña incorrectos. Inténtalo de nuevo.</span>
+            </div>
+
+            <!-- Formulario Iniciar Sesión -->
+            <form id="lock-form-login" onsubmit="handleLockScreenLogin(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-400 mb-1">Usuario *</label>
+                    <input type="text" id="lock-username-input" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" value="paaauf" placeholder="Ej: paaauf"
+                        class="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-extrabold uppercase text-slate-400 mb-1">Contraseña *</label>
+                    <div class="relative">
+                        <input type="password" id="lock-password-input" required autocomplete="current-password" autocapitalize="none" autocorrect="off" placeholder="Tu contraseña..."
+                            class="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-12">
+                        <button type="button" onclick="togglePasswordVisibility('lock-password-input')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500 p-1">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 cursor-pointer pt-0.5">
+                    <input type="checkbox" id="lock-remember-device" class="w-4 h-4 accent-indigo-600 rounded">
+                    <span>Recordar mi sesión en este dispositivo</span>
+                </label>
+
+                <div class="space-y-2 pt-1">
+                    <button type="submit" class="w-full py-3.5 rounded-2xl text-xs sm:text-sm font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 active:scale-95 transition">
+                        Entrar a mi Cuenta
+                    </button>
+                    <button type="button" onclick="handleLockScreenFaceId()" class="w-full py-3 rounded-2xl text-xs font-extrabold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-500 border border-emerald-500/30 flex items-center justify-center gap-2 active:scale-95 transition">
+                        <span>🪪 Entrar con Face ID</span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Formulario Crear Cuenta -->
+            <form id="lock-form-register" onsubmit="handleLockScreenRegister(event)" class="hidden space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Nombre de Usuario *</label>
+                    <input type="text" id="lock-reg-username" required placeholder="Ej: marcos"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tu Nombre Visible *</label>
+                    <input type="text" id="lock-reg-name" required placeholder="Ej: Marcos"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Contraseña (mínimo 4 caracteres) *</label>
+                    <input type="password" id="lock-reg-password" required minlength="4" placeholder="••••"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Peso actual (kg)</label>
+                        <input type="number" step="0.1" id="lock-reg-weight" placeholder="Ej: 75"
+                            class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Altura (cm)</label>
+                        <input type="number" id="lock-reg-height" placeholder="Ej: 178"
+                            class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-3.5 rounded-2xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 active:scale-95 transition">
+                    Crear Mi Cuenta y Entrar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <header class="sticky top-0 z-30 ios-blur-bar border-b border-slate-200/70 dark:border-white/10 safe-top">
+        <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-3 min-w-0">
+                <button onclick="openAuthModal()" title="Cuenta y Seguridad" class="relative w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-extrabold text-base shadow-md shadow-indigo-500/25 shrink-0 active:scale-95 transition">
+                    <span id="header-avatar-letter">P</span>
+                    <span id="header-admin-crown" class="hidden absolute -top-1.5 -right-1.5 text-xs">👑</span>
+                </button>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <h1 id="header-greeting" class="text-base sm:text-lg font-extrabold tracking-tight truncate">
+                            Hola, paaauf
+                        </h1>
+                        <span id="header-role-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            ADMIN 👑
+                        </span>
+                        <button onclick="switchTab('ajustes')" id="cloud-status-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 transition">
+                            <span id="cloud-status-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span id="cloud-status-text">Nube ☁️</span>
+                        </button>
+                    </div>
+                    <p id="current-date-label" class="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                        Cargando fecha...
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="openAuthModal()" title="Cambiar de cuenta" class="px-2.5 py-1.5 rounded-full text-xs font-bold bg-slate-200/80 dark:bg-white/10 text-slate-700 dark:text-slate-200 flex items-center gap-1 active:scale-95 transition">
+                    <i data-lucide="user" class="w-3.5 h-3.5 text-indigo-500"></i>
+                    <span id="header-friend-code" class="text-[11px] font-mono font-extrabold">#PAU05</span>
+                </button>
+
+                <button onclick="logoutAndLockApp()" title="Bloquear sesión" class="w-9 h-9 rounded-full bg-rose-500/15 text-rose-500 flex items-center justify-center active:scale-90 transition">
+                    <i data-lucide="lock" class="w-4 h-4"></i>
+                </button>
+
+                <button onclick="toggleTheme()" title="Cambiar tema" class="w-9 h-9 rounded-full bg-slate-200/80 dark:bg-white/10 flex items-center justify-center text-slate-700 dark:text-slate-200 active:scale-90 transition">
+                    <i data-lucide="sun" class="w-4 h-4 hidden dark:block text-amber-400"></i>
+                    <i data-lucide="moon" class="w-4 h-4 block dark:hidden text-indigo-600"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 pt-4 space-y-5">
+
+        <!-- TAB 1: HOY -->
+        <div id="tab-hoy" class="space-y-4">
+            
+            <!-- AVISO DE EXAMEN O TAREA URGENTE (SOLO EN PESTAÑA HOY) -->
+            <div id="today-urgent-deadline-banner" class="hidden p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-between gap-3 shadow-sm">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <i data-lucide="bell" class="w-4 h-4 shrink-0 animate-bounce"></i>
+                    <p id="today-urgent-deadline-text" class="text-xs font-bold truncate">Entrega próxima: Ninguna</p>
+                </div>
+                <button onclick="switchTab('uni')" class="px-3 py-1 rounded-xl text-xs font-extrabold bg-amber-500 text-slate-950 shrink-0 hover:opacity-90 active:scale-95 transition">
+                    Ver →
+                </button>
+            </div>
+
+            <!-- Tira de la Semana (Lunes a Domingo) -->
+            <div class="ios-card rounded-3xl p-3 sm:p-4 border border-slate-200/70 dark:border-white/10">
+                <div class="flex items-center justify-between mb-2.5">
+                    <span id="current-week-label" class="text-xs font-extrabold uppercase tracking-wider text-indigo-500">Semana Actual</span>
+                    <span class="text-[11px] text-slate-400 font-semibold">Toca un día para ver tus registros</span>
+                </div>
+                <div id="week-strip-container" class="grid grid-cols-7 gap-1.5 sm:gap-2"></div>
+            </div>
+
+            <!-- Resumen Rápido -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="ios-card rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-white/10 flex items-center gap-4">
+                    <div class="relative w-16 h-16 shrink-0 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                            <path class="text-slate-200 dark:text-white/10" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            <path id="today-progress-ring" class="text-indigo-600 dark:text-indigo-500 transition-all duration-500" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <span id="today-progress-pct" class="absolute text-xs font-extrabold">0%</span>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-base">Progreso de Hoy</h3>
+                        <p id="today-completed-count" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">0 de 0 completados</p>
+                    </div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-white/10 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase text-amber-500 tracking-wider">Racha Máxima</span>
+                        <h3 id="stat-max-streak" class="text-2xl font-black mt-1">0 días 🔥</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Constancia semanal</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center text-xl">⚡</div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-white/10 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase text-emerald-500 tracking-wider">Objetivo Diario</span>
+                        <h3 class="text-2xl font-black mt-1">100% 🎯</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">¡A por todas hoy!</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-xl">✨</div>
+                </div>
+            </div>
+
+            <!-- Lista de Hábitos Diarios -->
+            <div class="ios-card rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-white/10">
+                    <h3 class="font-extrabold text-base flex items-center gap-2"><span>⚡</span> Hábitos Diarios</h3>
+                    <button onclick="openHabitModal()" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow hover:bg-indigo-500 active:scale-95 transition flex items-center gap-1">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>Nuevo Hábito</span>
+                    </button>
+                </div>
+                <div id="habits-list-container" class="space-y-2.5"></div>
+            </div>
+
+            <!-- Contador de Vasos de Agua -->
+            <div class="ios-card rounded-3xl p-4 sm:p-5 border border-slate-200/70 dark:border-white/10 space-y-3.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center text-xl shrink-0">💧</div>
+                        <div>
+                            <h3 class="font-extrabold text-base">Hidratación Diaria</h3>
+                            <p id="water-goal-badge" class="text-xs text-slate-500 dark:text-slate-400 font-semibold">0 / 10 vasos (2.50 L)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="changeWaterGlasses(1)" class="px-3 py-2 rounded-2xl text-xs font-extrabold bg-cyan-500 text-white shadow-md shadow-cyan-500/30 active:scale-95 transition flex items-center gap-1">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> +1 Vaso
+                        </button>
+                        <button onclick="changeWaterGlasses(-1)" class="w-9 h-9 rounded-2xl bg-slate-200/80 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300 active:scale-90 transition">
+                            <i data-lucide="minus" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="w-full bg-slate-200/80 dark:bg-white/10 h-3 rounded-full overflow-hidden">
+                    <div id="water-progress-bar" class="bg-gradient-to-r from-cyan-400 to-sky-500 h-full w-0 transition-all duration-500"></div>
+                </div>
+
+                <div class="grid grid-cols-5 sm:grid-cols-10 gap-2 pt-1" id="water-glasses-grid"></div>
+            </div>
+
+            <!-- Rutina de Gimnasio del Día + Cronómetro Descanso -->
+            <div class="ios-card rounded-3xl p-4 sm:p-5 border border-indigo-500/25 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-2xl shrink-0">🏋️‍♂️</div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                                    Rutina del <span id="gym-card-day-name">Miércoles</span>
+                                </span>
+                            </div>
+                            <h3 id="gym-card-routine-title" class="font-extrabold text-base sm:text-lg mt-0.5">Sin rutina asignada</h3>
+                        </div>
+                    </div>
+
+                    <button onclick="openGymRoutineModal()" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-500/25 flex items-center justify-center gap-1.5 active:scale-95 transition shrink-0">
+                        <i data-lucide="calendar-cog" class="w-4 h-4"></i>
+                        <span>Configurar Rutina</span>
+                    </button>
+                </div>
+
+                <!-- Cronómetro de Descanso entre Series -->
+                <div class="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="timer" class="w-4 h-4 text-indigo-500"></i>
+                        <span class="text-xs font-extrabold">Descanso entre series:</span>
+                        <span id="gym-rest-timer-display" class="font-mono text-sm font-black px-2.5 py-0.5 rounded-lg bg-indigo-500/15 text-indigo-500">00:00</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="startGymRestTimer(60)" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-200 dark:bg-white/10 hover:bg-indigo-600 hover:text-white transition active:scale-95">1:00</button>
+                        <button type="button" onclick="startGymRestTimer(90)" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-200 dark:bg-white/10 hover:bg-indigo-600 hover:text-white transition active:scale-95">1:30</button>
+                        <button type="button" onclick="startGymRestTimer(120)" class="px-2.5 py-1 rounded-xl text-[11px] font-extrabold bg-slate-200 dark:bg-white/10 hover:bg-indigo-600 hover:text-white transition active:scale-95">2:00</button>
+                        <button type="button" onclick="stopGymRestTimer()" class="px-2 py-1 rounded-xl text-[11px] font-bold text-slate-400 hover:text-rose-500">Parar</button>
+                    </div>
+                </div>
+
+                <div id="hoy-gym-exercises-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+            </div>
+        </div>
+
+        <!-- TAB 2: COMIDAS -->
+        <div id="tab-comidas" class="hidden space-y-4">
+            <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase text-emerald-500 tracking-wider">Nutrición & Macros</span>
+                        <h2 class="text-xl font-black mt-0.5">Control de Comidas</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="meals-total-kcal" class="px-3 py-1 rounded-xl bg-emerald-500/15 text-emerald-500 font-extrabold text-xs">0 / 2400 kcal</span>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <div class="flex justify-between text-xs font-bold">
+                        <span>Calorías Consumidas</span>
+                        <span id="meals-kcal-ratio">0% de tu objetivo</span>
+                    </div>
+                    <div class="w-full bg-slate-200 dark:bg-white/10 h-3.5 rounded-full overflow-hidden">
+                        <div id="meals-kcal-bar" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full w-0 transition-all duration-500"></div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 pt-2 text-center text-xs font-extrabold">
+                        <div class="p-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+                            <span class="text-[10px] text-slate-400 block uppercase">Proteínas</span>
+                            <span id="macro-prot-sum" class="text-emerald-500">0g</span>
+                        </div>
+                        <div class="p-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+                            <span class="text-[10px] text-slate-400 block uppercase">Carbos</span>
+                            <span id="macro-carb-sum" class="text-sky-500">0g</span>
+                        </div>
+                        <div class="p-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+                            <span class="text-[10px] text-slate-400 block uppercase">Grasas</span>
+                            <span id="macro-fat-sum" class="text-amber-500">0g</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3.5">
+                    <h3 class="font-extrabold text-sm flex items-center gap-2"><span>🍽️</span> Registrar Alimento o Plato</h3>
+                    <form onsubmit="saveMealEntry(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tipo de Comida</label>
+                            <div id="meal-type-pills" class="grid grid-cols-4 gap-1.5">
+                                <button type="button" onclick="selectMealType('Desayuno')" class="py-2 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow">Desayuno</button>
+                                <button type="button" onclick="selectMealType('Comida')" class="py-2 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300">Comida</button>
+                                <button type="button" onclick="selectMealType('Cena')" class="py-2 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300">Cena</button>
+                                <button type="button" onclick="selectMealType('Snack')" class="py-2 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300">Snack</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Descripción de lo que has comido *</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="meal-desc-input" required placeholder="Ej: 200g pechuga de pollo, arroz..."
+                                    class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                                <button type="button" onclick="calculateMacrosAutomatically()" title="Estimar macros con IA" class="px-3.5 py-2.5 rounded-2xl bg-indigo-600 text-white text-xs font-extrabold shrink-0 shadow flex items-center gap-1 active:scale-95 transition">
+                                    <span>✨ Calcular</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-2">
+                            <div>
+                                <label class="block text-[9px] font-bold uppercase text-slate-400 mb-1">Kcal</label>
+                                <input type="number" id="meal-kcal-input" required placeholder="550" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-extrabold">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold uppercase text-slate-400 mb-1">Prot (g)</label>
+                                <input type="number" id="meal-prot-input" required placeholder="45" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-extrabold">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold uppercase text-slate-400 mb-1">Carb (g)</label>
+                                <input type="number" id="meal-carb-input" required placeholder="60" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-extrabold">
+                            </div>
+                            <div>
+                                <label class="block text-[9px] font-bold uppercase text-slate-400 mb-1">Grasa (g)</label>
+                                <input type="number" id="meal-fat-input" required placeholder="12" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-extrabold">
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-pointer pt-1">
+                            <input type="checkbox" id="meal-save-favorite" class="w-4 h-4 accent-indigo-600 rounded">
+                            <span>⭐ Guardar también en Mis Platos Favoritos (1 toque)</span>
+                        </label>
+
+                        <button type="submit" class="w-full py-3 rounded-2xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 active:scale-95 transition">
+                            Añadir Comida al Día
+                        </button>
+                    </form>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-sm flex items-center gap-2"><span>⭐</span> Platos Favoritos (1 toque)</h3>
+                    <p class="text-[11px] text-slate-400">Toca cualquier plato guardado para sumarlo automáticamente a tus calorías y macros de hoy:</p>
+                    <div id="favorite-meals-grid" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+
+            <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                <h3 class="font-extrabold text-sm">Alimentos registrados hoy</h3>
+                <div id="today-meals-list" class="space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- TAB 3: UNI / TAREAS -->
+        <div id="tab-uni" class="hidden space-y-4">
+            <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-200/80 dark:bg-white/10 text-xs font-extrabold">
+                <button type="button" onclick="switchUniSubView('tareas')" id="unitab-btn-tareas" class="py-2.5 rounded-xl bg-indigo-600 text-white shadow transition">📝 Tareas y Entregas</button>
+                <button type="button" onclick="switchUniSubView('examenes')" id="unitab-btn-examenes" class="py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition">📅 Calendario de Exámenes</button>
+            </div>
+
+            <!-- SUBVISTA A: TAREAS + POMODORO -->
+            <div id="unisub-tareas" class="space-y-4">
+                <div class="ios-card rounded-3xl p-5 border border-purple-500/30 space-y-4 bg-gradient-to-br from-purple-500/10 to-indigo-500/10">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl shrink-0">🎓</div>
+                            <div>
+                                <h3 class="font-extrabold text-base">Modo Enfoque (Pomodoro)</h3>
+                                <p id="pomodoro-status-text" class="text-xs text-purple-400 font-bold">Tiempo de concentración (25 min)</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="setPomodoroMode('focus')" id="pomomode-focus" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow">Estudio</button>
+                            <button onclick="setPomodoroMode('break')" id="pomomode-break" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400">Descanso</button>
+                        </div>
+                    </div>
+
+                    <div class="text-center py-2">
+                        <span id="pomodoro-timer-display" class="font-mono text-5xl sm:text-6xl font-black tracking-wider text-purple-600 dark:text-purple-400">25:00</span>
+                    </div>
+
+                    <div class="flex items-center justify-center gap-3">
+                        <button onclick="togglePomodoroTimer()" id="pomodoro-start-btn" class="px-6 py-3 rounded-2xl text-xs sm:text-sm font-extrabold bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/30 active:scale-95 transition">
+                            ▶️ Iniciar Enfoque
+                        </button>
+                        <button onclick="resetPomodoroTimer()" class="px-4 py-3 rounded-2xl text-xs font-extrabold bg-slate-200/80 dark:bg-white/10 hover:bg-slate-300 dark:hover:bg-white/20 active:scale-95 transition">
+                            🔄 Reiniciar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-200/60 dark:border-white/10">
+                        <div>
+                            <h3 class="font-extrabold text-base">Tareas Pendientes y Entregas</h3>
+                            <p class="text-xs text-slate-400">Organiza tus trabajos universitarios con fecha límite</p>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="setTaskFilter('pending')" id="filter-btn-pending" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white">Pendientes</button>
+                            <button onclick="setTaskFilter('all')" id="filter-btn-all" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400">Todas</button>
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleAddTask(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div class="sm:col-span-6">
+                            <input type="text" id="task-title-input" required placeholder="Título de la tarea o trabajo..."
+                                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                        </div>
+                        <div class="sm:col-span-3">
+                            <input type="date" id="task-date-input" required class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                        </div>
+                        <div class="sm:col-span-3">
+                            <button type="submit" class="w-full py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow active:scale-95 transition flex items-center justify-center gap-1">
+                                <i data-lucide="plus" class="w-4 h-4"></i> Añadir Tarea
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="tasks-list-container" class="space-y-2.5"></div>
+                </div>
+            </div>
+
+            <!-- SUBVISTA B: EXÁMENES -->
+            <div id="unisub-examenes" class="hidden space-y-4">
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 id="calendar-month-title" class="font-extrabold text-lg">Octubre 2026</h3>
+                            <p class="text-xs text-slate-400">Toca cualquier día del mes para apuntar un examen</p>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="changeCalendarMonth(-1)" class="w-9 h-9 rounded-xl bg-slate-200/80 dark:bg-white/10 flex items-center justify-center active:scale-90 transition">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="changeCalendarMonth(1)" class="w-9 h-9 rounded-xl bg-slate-200/80 dark:bg-white/10 flex items-center justify-center active:scale-90 transition">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-extrabold text-slate-400 pb-2">
+                        <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+                    </div>
+                    <div id="exam-calendar-grid" class="grid grid-cols-7 gap-1.5"></div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3.5">
+                    <h3 class="font-extrabold text-sm flex items-center gap-2"><span>📅</span> Programar Examen</h3>
+                    <form onsubmit="handleAddExam(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                        <div class="sm:col-span-5">
+                            <input type="text" id="exam-title-input" required placeholder="Asignatura o nombre del examen..."
+                                class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                        </div>
+                        <div class="sm:col-span-4">
+                            <input type="date" id="exam-date-input" required class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                        </div>
+                        <div class="sm:col-span-3">
+                            <button type="submit" class="w-full py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 text-white shadow active:scale-95 transition">Guardar Examen</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-sm">Exámenes programados</h3>
+                    <div id="exams-list-container" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: PROGRESO -->
+        <div id="tab-progreso" class="hidden space-y-4">
+            <div class="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-200/80 dark:bg-white/10 text-xs font-extrabold">
+                <button type="button" onclick="switchProgressSubView('amigos')" id="progtab-btn-amigos" class="py-2.5 rounded-xl bg-indigo-600 text-white shadow transition">🏆 Ranking Amigos</button>
+                <button type="button" onclick="switchProgressSubView('fisico')" id="progtab-btn-fisico" class="py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition">📸 Check Físico</button>
+                <button type="button" onclick="switchProgressSubView('estadisticas')" id="progtab-btn-estadisticas" class="py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition">📊 Estadísticas</button>
+            </div>
+
+            <!-- SUBVISTA A: RANKING AMIGOS -->
+            <div id="progsub-amigos" class="space-y-4">
+                <div class="ios-card rounded-3xl p-5 border border-amber-500/30 space-y-4 bg-gradient-to-br from-amber-500/10 to-orange-500/10">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-xl shrink-0">🏆</div>
+                            <div>
+                                <h3 class="font-extrabold text-base">Liga Semanal con Amigos</h3>
+                                <p class="text-xs text-amber-500 font-bold">Compara tus hábitos y constancia de gimnasio</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[10px] font-extrabold uppercase text-slate-400 block">Tu Código</span>
+                            <span id="my-friend-code-badge" class="font-mono text-sm font-black text-indigo-500">#PAU05</span>
+                            <button onclick="copyMyFriendCode()" class="block text-[10px] text-indigo-400 underline">Copiar</button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-1">
+                        <input type="text" id="friend-code-input" placeholder="Introduce código de amigo (ej: #MARC)..."
+                            class="w-full px-3.5 py-2.5 rounded-2xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/15 text-xs font-bold uppercase">
+                        <button onclick="handleAddFriendByCode()" class="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-extrabold shrink-0 shadow active:scale-95 transition">
+                            Añadir Amigo
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-sm">Clasificación Actual</h3>
+                    <div id="friends-ranking-list" class="space-y-2.5"></div>
+                </div>
+            </div>
+
+            <!-- SUBVISTA B: CHECK FÍSICO -->
+            <div id="progsub-fisico" class="hidden space-y-4">
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-extrabold text-base">Registro Fotográfico Físico</h3>
+                            <p class="text-xs text-slate-400">Sube fotos de tus checks físicos para comparar tu evolución</p>
+                        </div>
+                        <span class="text-2xl">📸</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Seleccionar Foto</label>
+                            <input type="file" id="physique-photo-file" accept="image/*" onchange="previewSelectedPhysiquePhoto(event)"
+                                class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Peso en ese check (kg)</label>
+                            <div class="flex gap-2">
+                                <input type="number" step="0.1" id="physique-photo-weight" placeholder="Ej: 81.2"
+                                    class="w-full px-3 py-2 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/15 text-xs font-bold">
+                                <button type="button" onclick="handleAddProgressPhoto()" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-extrabold shrink-0 shadow active:scale-95 transition">
+                                    Guardar Check
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="physique-preview-container" class="hidden text-center py-2">
+                        <img id="physique-preview-img" src="" alt="Preview" class="w-32 h-32 object-cover rounded-2xl mx-auto border-2 border-indigo-500 shadow-md">
+                    </div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-sm">Comparador Antes vs. Después</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Foto Inicial (Antes)</label>
+                            <select id="compare-before-select" onchange="renderPhysiqueComparison()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                                <option value="">Selecciona check inicial...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Foto Reciente (Después)</label>
+                            <select id="compare-after-select" onchange="renderPhysiqueComparison()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                                <option value="">Selecciona check reciente...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="physique-comparison-view" class="grid grid-cols-2 gap-3 pt-2">
+                        <div class="text-center p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-xs text-slate-400">Selecciona dos fotos para comparar</div>
+                        <div class="text-center p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-xs text-slate-400">Evolución lado a lado</div>
+                    </div>
+                </div>
+
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-sm">Tus Checks Anteriores</h3>
+                    <div id="physique-gallery-strip" class="flex gap-3 overflow-x-auto pb-2 no-scrollbar"></div>
+                </div>
+            </div>
+
+            <!-- SUBVISTA C: ESTADÍSTICAS -->
+            <div id="progsub-estadisticas" class="hidden space-y-4">
+                <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                    <h3 class="font-extrabold text-base">Rendimiento Semanal (Hábitos cumplidos)</h3>
+                    <div class="h-64 relative"><canvas id="weekly-chart"></canvas></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                        <h3 class="font-extrabold text-base">Evolución de Peso Corporal (kg)</h3>
+                        <div class="h-56 relative"><canvas id="weight-chart"></canvas></div>
+                    </div>
+                    <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                        <h3 class="font-extrabold text-base">Rachas por Hábito</h3>
+                        <div class="h-56 relative"><canvas id="streaks-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: AJUSTES -->
+        <div id="tab-ajustes" class="hidden space-y-4">
+            <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-200/70 dark:border-white/10">
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase text-indigo-500">Configuración Personal</span>
+                        <h3 class="font-extrabold text-lg mt-0.5">Tu Perfil Físico y Metas</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center font-black">⚙️</div>
+                </div>
+
+                <form onsubmit="handleSaveProfile(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Nombre Visible</label>
+                            <input type="text" id="prof-name" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Edad (años)</label>
+                            <input type="number" id="prof-age" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Peso actual (kg)</label>
+                            <input type="number" step="0.1" id="prof-weight" required oninput="recalculateRecommendedTargets()" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Altura (cm)</label>
+                            <input type="number" id="prof-height" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Meta Calórica (kcal)</label>
+                            <input type="number" id="prof-target-kcal" required class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Proteína Diaria (g)</label>
+                            <input type="number" id="prof-target-prot" required class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Agua (Litros)</label>
+                            <input type="number" step="0.1" id="prof-target-water" required class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full py-3 rounded-2xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow active:scale-95 transition">
+                        Guardar Cambios de Perfil
+                    </button>
+                </form>
+            </div>
+
+            <div class="ios-card rounded-3xl p-5 space-y-3.5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center shrink-0">
+                            <i data-lucide="shield-check" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-extrabold">Seguridad, Contraseña y Face ID</h4>
+                            <p id="settings-active-account-sub" class="text-xs text-slate-400">Sesión iniciada</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="openAuthModal()" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white active:scale-95 transition">Cuentas</button>
+                        <button onclick="logoutAndLockApp()" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-rose-500/15 text-rose-500 border border-rose-500/30 active:scale-95 transition">Salir 🔒</button>
+                    </div>
+                </div>
+
+                <form onsubmit="handleChangePassword(event)" class="pt-2 border-t border-slate-200/60 dark:border-white/10 grid grid-cols-1 sm:grid-cols-12 gap-2">
+                    <div class="sm:col-span-8">
+                        <input type="password" id="settings-new-pass" required minlength="4" placeholder="Nueva contraseña (mínimo 4 caracteres)..."
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                    </div>
+                    <div class="sm:col-span-4">
+                        <button type="submit" class="w-full py-2.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 hover:bg-indigo-600 hover:text-white transition">Cambiar Clave</button>
+                    </div>
+                </form>
+
+                <div class="pt-1 flex flex-wrap items-center justify-between gap-2">
+                    <button type="button" onclick="registerFaceIdForCurrentAccount()" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 flex items-center gap-1.5 active:scale-95 transition">
+                        <span>🪪 Activar o Vincular Face ID en este dispositivo</span>
+                    </button>
+                    <span id="settings-faceid-status" class="text-[11px] text-slate-400 font-semibold">Face ID: No vinculado</span>
+                </div>
+            </div>
+
+            <!-- PANEL DE ADMINISTRADOR -->
+            <div id="admin-panel-container" class="hidden ios-card rounded-3xl p-5 border border-amber-500/40 space-y-4 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
+                <div class="flex items-center justify-between pb-3 border-b border-amber-500/30">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center font-bold">👑</div>
+                        <div>
+                            <h4 class="text-sm font-extrabold">Panel de Control de Administrador</h4>
+                            <p class="text-xs text-amber-500">Gestión global de todas las cuentas registradas</p>
+                        </div>
+                    </div>
+                    <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-500 text-slate-950">MODO ADMIN</span>
+                </div>
+                <div id="admin-users-list" class="space-y-2"></div>
+            </div>
+
+            <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center shrink-0">📱</div>
+                    <div>
+                        <h4 class="text-sm font-extrabold">Cómo instalar esta app en tu iPhone</h4>
+                        <p class="text-xs text-slate-400">Accede como una app nativa a pantalla completa</p>
+                    </div>
+                </div>
+                <ol class="text-xs space-y-2 text-slate-600 dark:text-slate-300 list-decimal pl-4 pt-1">
+                    <li>Abre este enlace en el navegador <strong>Safari</strong> de tu iPhone.</li>
+                    <li>Pulsa el botón de <strong>Compartir</strong> <span class="inline-block px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-[10px]">⎋</span> en la barra inferior de Safari.</li>
+                    <li>Desplázate y selecciona <strong>"Añadir a la pantalla de inicio"</strong>.</li>
+                    <li>Pulsa <strong>Añadir</strong> arriba a la derecha. ¡Listo! Ya tendrás HabitPulse en tu pantalla de inicio.</li>
+                </ol>
+            </div>
+        </div>
+
+    </main>
+
+    <nav class="fixed bottom-0 inset-x-0 z-40 ios-blur-bar border-t border-slate-200/70 dark:border-white/10 pb-safe">
+        <div class="max-w-md mx-auto px-4 py-2 grid grid-cols-5 gap-1 text-center">
+            <button onclick="switchTab('hoy')" id="nav-btn-hoy" class="flex flex-col items-center justify-center py-1.5 rounded-2xl text-indigo-600 dark:text-indigo-400 transition active:scale-90">
+                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                <span class="text-[10px] font-extrabold mt-1">Hoy</span>
+            </button>
+            <button onclick="switchTab('comidas')" id="nav-btn-comidas" class="flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition active:scale-90">
+                <i data-lucide="utensils" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold mt-1">Comidas</span>
+            </button>
+            <button onclick="switchTab('uni')" id="nav-btn-uni" class="flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition active:scale-90">
+                <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold mt-1">Uni / Tareas</span>
+            </button>
+            <button onclick="switchTab('progreso')" id="nav-btn-progreso" class="flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition active:scale-90">
+                <i data-lucide="trophy" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold mt-1">Progreso</span>
+            </button>
+            <button onclick="switchTab('ajustes')" id="nav-btn-ajustes" class="flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition active:scale-90">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="text-[10px] font-bold mt-1">Ajustes</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- MODAL 1: AUTENTICACIÓN / CUENTAS -->
+    <div id="auth-modal" class="fixed inset-0 z-[130] hidden items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+        <div class="ios-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 border-t sm:border border-white/15 shadow-2xl ios-sheet-enter max-h-[90vh] overflow-y-auto">
+            <div class="w-10 h-1.5 bg-slate-300 dark:bg-white/20 rounded-full mx-auto mb-4 sm:hidden"></div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200/70 dark:border-white/10">
+                <h3 class="text-base font-extrabold">Cuentas y Seguridad</h3>
+                <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-slate-200/70 dark:bg-white/10 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-200/70 dark:bg-white/10 text-xs font-extrabold my-3">
+                <button type="button" onclick="switchAuthModalView('login')" id="authmodal-tab-login" class="py-2 rounded-xl bg-indigo-600 text-white shadow transition">🔑 Seleccionar Cuenta</button>
+                <button type="button" onclick="switchAuthModalView('register')" id="authmodal-tab-register" class="py-2 rounded-xl text-slate-500 dark:text-slate-300 transition">✨ Crear Cuenta Nueva</button>
+            </div>
+
+            <div id="auth-view-login" class="space-y-3.5">
+                <span class="text-[11px] font-bold uppercase text-slate-400 block">Selecciona tu cuenta:</span>
+                <div id="auth-accounts-list" class="space-y-2"></div>
+
+                <form id="auth-password-prompt-box" onsubmit="handleConfirmAccountLogin(event)" class="hidden p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] font-extrabold uppercase text-indigo-400 block">Cuenta Protegida</span>
+                            <h4 id="login-selected-user-title" class="text-sm font-extrabold">Entrar como Usuario</h4>
+                        </div>
+                        <span class="text-lg">🔒</span>
+                    </div>
+
+                    <div id="modal-login-error-box" class="hidden p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-extrabold flex items-center gap-2">
+                        <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+                        <span id="modal-login-error-text">Contraseña incorrecta.</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Introduce tu contraseña</label>
+                        <input type="password" id="login-password-input" placeholder="Contraseña..."
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/15 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <button type="submit" class="flex-1 py-2.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow active:scale-95 transition">Desbloquear y Entrar</button>
+                        <button type="button" id="btn-login-faceid" onclick="triggerFaceIdLogin()" class="hidden px-4 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 active:scale-95 transition">
+                            <span>🪪 Usar Face ID</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <form id="auth-view-register" onsubmit="handleRegisterNewAccount(event)" class="hidden space-y-3">
+                <p class="text-xs text-slate-500 dark:text-slate-400">Crea tu perfil personal limpio. Nadie podrá entrar sin tu contraseña.</p>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Nombre de Usuario *</label>
+                    <input type="text" id="reg-username" required placeholder="Ej: marcos" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Tu Nombre Visible *</label>
+                    <input type="text" id="reg-name" required placeholder="Ej: Marcos" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Crea una Contraseña *</label>
+                    <input type="password" id="reg-pin" required minlength="4" placeholder="Mínimo 4 caracteres" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Peso actual (kg)</label>
+                        <input type="number" step="0.1" id="reg-weight" placeholder="Ej: 75" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-400 mb-1">Altura (cm)</label>
+                        <input type="number" id="reg-height" placeholder="Ej: 178" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                </div>
+                <label class="flex items-center gap-2 text-xs font-bold text-emerald-500 cursor-pointer pt-1">
+                    <input type="checkbox" id="reg-enable-faceid" class="w-4 h-4 accent-emerald-500 rounded">
+                    <span>🪪 Activar también desbloqueo con Face ID</span>
+                </label>
+                <button type="submit" class="w-full py-3.5 rounded-2xl text-xs font-extrabold bg-emerald-600 text-white shadow-lg shadow-emerald-600/25 active:scale-95 transition">Crear Cuenta y Entrar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: RUTINA SEMANAL DE GIMNASIO -->
+    <div id="gym-routine-modal" class="fixed inset-0 z-[130] hidden items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+        <div class="ios-card w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 border-t sm:border border-white/15 shadow-2xl ios-sheet-enter max-h-[90vh] overflow-y-auto">
+            <div class="w-10 h-1.5 bg-slate-300 dark:bg-white/20 rounded-full mx-auto mb-4 sm:hidden"></div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200/70 dark:border-white/10">
+                <h3 class="text-base font-extrabold">Rutina Semanal de Gimnasio</h3>
+                <button onclick="closeGymRoutineModal()" class="w-8 h-8 rounded-full bg-slate-200/70 dark:bg-white/10 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-7 gap-1 my-3.5" id="gym-modal-days-strip"></div>
+
+            <div class="space-y-4 pt-2">
+                <div class="space-y-2">
+                    <label class="block text-[10px] font-extrabold uppercase text-slate-400">Título del Entrenamiento para este Día</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="gym-modal-title-input" placeholder="Ej: Lunes · Empuje (Pecho, Hombro, Tríceps)"
+                            class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 text-xs font-bold border border-slate-200 dark:border-white/10">
+                        <button type="button" onclick="saveGymSessionTitle()" class="px-4 py-2.5 rounded-2xl text-xs font-extrabold bg-indigo-600 text-white shadow shrink-0 active:scale-95 transition">Guardar Título</button>
+                    </div>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-200/60 dark:border-white/10">
+                    <span class="text-[10px] font-extrabold uppercase text-slate-400 block">Ejercicios de este Día y Pesos (kg)</span>
+                    <div id="gym-modal-exercises-list" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+                </div>
+
+                <form onsubmit="handleAddGymExercise(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-2">
+                    <div class="sm:col-span-6">
+                        <input type="text" id="new-gym-ex-name" required placeholder="Nombre (ej: Press de Banca)..." class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <input type="text" id="new-gym-ex-weight" required placeholder="Peso (ej: 80kg)" class="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/10 text-xs font-bold">
+                    </div>
+                    <div class="sm:col-span-3">
+                        <button type="submit" class="w-full py-2 rounded-xl text-xs font-extrabold bg-emerald-600 text-white shadow active:scale-95 transition">+ Ejercicio</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: CREAR / EDITAR HÁBITO -->
+    <div id="habit-modal" class="fixed inset-0 z-[130] hidden items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+        <div class="ios-card w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 border-t sm:border border-white/15 shadow-2xl ios-sheet-enter">
+            <div class="w-10 h-1.5 bg-slate-300 dark:bg-white/20 rounded-full mx-auto mb-4 sm:hidden"></div>
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200/70 dark:border-white/10">
+                <h3 id="modal-habit-title" class="text-base font-extrabold">Nuevo Hábito Diario</h3>
+                <button onclick="closeHabitModal()" class="w-8 h-8 rounded-full bg-slate-200/70 dark:bg-white/10 flex items-center justify-center">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleSaveHabit(event)" class="space-y-4 mt-4">
+                <input type="hidden" id="habit-edit-id" value="">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Nombre del Hábito *</label>
+                    <input type="text" id="habit-name-input" required placeholder="Ej: Leer 20 páginas, Meditar..." class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Icono Emoji</label>
+                        <input type="text" id="habit-emoji-input" value="⚡" maxlength="4" class="w-full px-3.5 py-2 rounded-2xl bg-slate-100 dark:bg-white/10 text-center text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-slate-400 mb-1">Color</label>
+                        <select id="habit-color-input" class="w-full px-3 py-2.5 rounded-2xl bg-slate-100 dark:bg-white/10">
+                            <option value="indigo">Índigo</option>
+                            <option value="amber">Ámbar</option>
+                            <option value="emerald">Esmeralda</option>
+                            <option value="rose">Coral</option>
+                            <option value="purple">Violeta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between gap-2 pt-2">
+                    <button type="button" id="btn-delete-habit" onclick="handleDeleteHabit()" class="hidden px-3.5 py-2.5 rounded-2xl text-xs font-extrabold bg-rose-500/15 text-rose-500 border border-rose-500/30 active:scale-95 transition">🗑️ Eliminar Hábito</button>
+                    <div class="flex justify-end gap-2 ml-auto">
+                        <button type="button" onclick="closeHabitModal()" class="px-4 py-2.5 rounded-2xl text-xs font-bold bg-slate-200/70 dark:bg-white/10">Cancelar</button>
+                        <button type="submit" class="px-5 py-2.5 rounded-2xl text-xs font-bold bg-indigo-600 text-white">Guardar</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const LOCAL_STORAGE_KEY = 'habitpulse_ios_v9_clean';
+        const REMEMBER_SESSION_KEY = 'habitpulse_remembered_user_v9';
+        const THEME_KEY = 'habitpulse_theme_v1';
+        const DAYS_SHORT = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+        const DAYS_FULL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+        function getTodayIndex() {
+            const jsDay = new Date().getDay();
+            return jsDay === 0 ? 6 : jsDay - 1;
+        }
+
+        function getTodayISO() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function getCurrentMondayISO() {
+            const now = new Date();
+            const todayIdx = getTodayIndex();
+            now.setDate(now.getDate() - todayIdx);
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        }
+
+        function playTimerBeep() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                [523.25, 659.25, 783.99].forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.18, ctx.currentTime + idx * 0.14);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.14 + 0.25);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + idx * 0.14);
+                    osc.stop(ctx.currentTime + idx * 0.14 + 0.26);
+                });
+            } catch (e) {}
+        }
+
+        function createUserAccount({ id, username, name, pin, role, friendCode, age, weight, height, goal, faceIdCredentialId }) {
+            const w = Number(weight) || 75;
+            const h = Number(height) || 178;
+            return {
+                id,
+                username: (username || name || 'user').toLowerCase().trim(),
+                pin: pin || '1234',
+                faceIdCredentialId: faceIdCredentialId || null,
+                role: role || 'user',
+                friendCode: friendCode || ('#' + (username || name || 'USR').slice(0, 4).toUpperCase() + Math.floor(10 + Math.random() * 89)),
+                friends: [],
+                lastWeekMondayISO: getCurrentMondayISO(),
+                studyMinutesWeek: 0,
+                profile: {
+                    name: name || username || 'Usuario',
+                    age: age || 22,
+                    weight: w,
+                    height: h,
+                    goal: goal || 'recomp',
+                    targetKcal: Math.round(w * 30),
+                    targetProtein: Math.round(w * 2),
+                    targetCarbs: 250,
+                    targetFat: 75,
+                    targetWaterLiters: 2.5
+                },
+                habits: [
+                    { id: 'h-gym', name: 'Ir al gimnasio', emoji: '💪', color: 'indigo', baseStreak: 0, days: [false, false, false, false, false, false, false] },
+                    { id: 'h-water', name: 'Beber 2.5L de agua', emoji: '💧', color: 'emerald', baseStreak: 0, days: [false, false, false, false, false, false, false] },
+                    { id: 'h-sleep', name: 'Dormir 8 horas', emoji: '😴', color: 'rose', baseStreak: 0, days: [false, false, false, false, false, false, false] }
+                ],
+                weeklyGymRoutine: {
+                    0: { title: 'Lunes · Sin asignar', exercises: [] },
+                    1: { title: 'Martes · Sin asignar', exercises: [] },
+                    2: { title: 'Miércoles · Sin asignar', exercises: [] },
+                    3: { title: 'Jueves · Sin asignar', exercises: [] },
+                    4: { title: 'Viernes · Sin asignar', exercises: [] },
+                    5: { title: 'Sábado · Sin asignar', exercises: [] },
+                    6: { title: 'Domingo · Descanso', exercises: [] }
+                },
+                waterGlassesByDay: [0, 0, 0, 0, 0, 0, 0],
+                favoriteMeals: [],
+                mealsByDay: {},
+                tasks: [],
+                exams: [],
+                physiquePhotos: [],
+                weightHistory: [{ date: getTodayISO(), weight: w }]
+            };
+        }
+
+        function getDefaultGlobalStore() {
+            return {
+                currentUserId: 'u-admin',
+                users: {
+                    'u-admin': createUserAccount({
+                        id: 'u-admin',
+                        username: 'paaauf',
+                        name: 'Pau Forner',
+                        pin: '31pau120520',
+                        role: 'admin',
+                        friendCode: '#PAU05',
+                        age: 20,
+                        weight: 81.2,
+                        height: 184
+                    })
+                }
+            };
+        }
+
+        let globalStore = getDefaultGlobalStore();
+        let state = globalStore.users[globalStore.currentUserId];
+        let isSessionUnlocked = false;
+
+        let selectedDayIdx = getTodayIndex();
+        let gymModalDayIdx = getTodayIndex();
+        let activeTab = 'hoy';
+        let activeUniSubView = 'tareas';
+        let activeProgressSubView = 'amigos';
+        let selectedMealType = 'Comida';
+        let taskFilter = 'pending';
+        let calendarViewDate = new Date();
+        let pendingLoginTargetUserId = null;
+
+        let weeklyChartInstance = null;
+        let streaksChartInstance = null;
+        let weightChartInstance = null;
+
+        let pomodoroMode = 'focus';
+        let pomodoroSecondsLeft = 25 * 60;
+        let pomodoroInterval = null;
+
+        let gymRestSecondsLeft = 0;
+        let gymRestInterval = null;
+
+        let pendingPhysiqueDataUrl = '';
+
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let unsubscribeSnapshot = null;
+        let isSavingCloud = false;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'habitpulse-default-app';
+
+        function checkAndPerformWeeklyRollover(userObj) {
+            if (!userObj) return;
+            const currentMonday = getCurrentMondayISO();
+            if (!userObj.lastWeekMondayISO) {
+                userObj.lastWeekMondayISO = currentMonday;
+                return;
+            }
+            if (userObj.lastWeekMondayISO !== currentMonday) {
+                (userObj.habits || []).forEach(h => {
+                    let endOfWeekStreak = 0;
+                    for (let i = 6; i >= 0; i--) {
+                        if (h.days[i]) endOfWeekStreak++;
+                        else break;
+                    }
+                    if (endOfWeekStreak === 7) {
+                        h.baseStreak = (h.baseStreak || 0) + 7;
+                    } else {
+                        h.baseStreak = endOfWeekStreak;
+                    }
+                    h.days = [false, false, false, false, false, false, false];
+                });
+                userObj.waterGlassesByDay = [0, 0, 0, 0, 0, 0, 0];
+                userObj.mealsByDay = {};
+                userObj.lastWeekMondayISO = currentMonday;
+            }
+        }
+
+        function syncActiveUserPointer() {
+            if (!globalStore || !globalStore.users) {
+                globalStore = getDefaultGlobalStore();
+            }
+            if (!globalStore.users['u-admin']) {
+                globalStore.users['u-admin'] = getDefaultGlobalStore().users['u-admin'];
+            } else {
+                globalStore.users['u-admin'].username = 'paaauf';
+                globalStore.users['u-admin'].role = 'admin';
+                if (!globalStore.users['u-admin'].pin || globalStore.users['u-admin'].pin === '1234') {
+                    globalStore.users['u-admin'].pin = '31pau120520';
+                }
+            }
+            if (!globalStore.users[globalStore.currentUserId]) {
+                globalStore.currentUserId = 'u-admin';
+            }
+            state = globalStore.users[globalStore.currentUserId];
+            if (!state.weeklyGymRoutine) state.weeklyGymRoutine = createUserAccount({}).weeklyGymRoutine;
+            if (!state.favoriteMeals) state.favoriteMeals = [];
+            if (!state.physiquePhotos) state.physiquePhotos = [];
+            if (!state.weightHistory) state.weightHistory = [{ date: getTodayISO(), weight: state.profile.weight || 75 }];
+            if (!state.friends) state.friends = [];
+            checkAndPerformWeeklyRollover(state);
+        }
+
+        function loadFromLocalBackup() {
+            try {
+                const savedTheme = localStorage.getItem(THEME_KEY);
+                if (savedTheme === 'light') document.documentElement.classList.remove('dark');
+                else document.documentElement.classList.add('dark');
+
+                const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && parsed.users && parsed.currentUserId) {
+                        globalStore = parsed;
+                        syncActiveUserPointer();
+                        return;
+                    }
+                }
+            } catch (e) {}
+            globalStore = getDefaultGlobalStore();
+            syncActiveUserPointer();
+            saveToLocalBackup();
+        }
+
+        function saveToLocalBackup() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(globalStore));
+            } catch (e) {}
+        }
+
+        function showToast(message, type = 'indigo') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            let bgClass = 'bg-indigo-600 text-white';
+            if (type === 'emerald') bgClass = 'bg-emerald-600 text-white';
+            if (type === 'rose') bgClass = 'bg-rose-600 text-white';
+            if (type === 'amber') bgClass = 'bg-amber-500 text-slate-950 font-black';
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-xl text-xs font-extrabold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 ${bgClass}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        async function initFirebaseCloud() {
+            try {
+                if (typeof __firebase_config === 'undefined') return;
+                const app = initializeApp(JSON.parse(__firebase_config));
+                auth = getAuth(app);
+                db = getFirestore(app);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const { signInWithCustomToken } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    if (user && db) {
+                        try {
+                            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'habitpulse_store', 'global_store_v9');
+                            unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+                                if (docSnap.exists() && !isSavingCloud) {
+                                    const cloudData = docSnap.data();
+                                    if (cloudData && cloudData.payload) {
+                                        const parsedCloud = JSON.parse(cloudData.payload);
+                                        if (parsedCloud && parsedCloud.users) {
+                                            const activeId = globalStore.currentUserId;
+                                            globalStore = parsedCloud;
+                                            if (activeId && globalStore.users[activeId]) {
+                                                globalStore.currentUserId = activeId;
+                                            }
+                                            syncActiveUserPointer();
+                                            renderAll();
+                                        }
+                                    }
+                                }
+                            }, (err) => {});
+                        } catch (listenerErr) {}
+                    }
+                });
+            } catch (e) {}
+        }
+
+        async function saveStateEverywhere() {
+            saveToLocalBackup();
+            if (!db || !currentUser || isSavingCloud) return;
+            try {
+                isSavingCloud = true;
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'habitpulse_store', 'global_store_v9');
+                await setDoc(docRef, { payload: JSON.stringify(globalStore), updatedAt: Date.now() });
+            } catch (e) {
+            } finally {
+                setTimeout(() => { isSavingCloud = false; }, 500);
+            }
+        }
+
+        function toggleTheme() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+            showToast(isDark ? 'Modo oscuro activado 🌙' : 'Modo claro activado ☀️', 'indigo');
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            ['hoy', 'comidas', 'uni', 'progreso', 'ajustes'].forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if (el) el.classList.toggle('hidden', t !== tabId);
+                const navBtn = document.getElementById(`nav-btn-${t}`);
+                if (navBtn) {
+                    if (t === tabId) {
+                        navBtn.className = 'flex flex-col items-center justify-center py-1.5 rounded-2xl text-indigo-600 dark:text-indigo-400 transition active:scale-90';
+                    } else {
+                        navBtn.className = 'flex flex-col items-center justify-center py-1.5 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition active:scale-90';
+                    }
+                }
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            renderAll();
+        }
+
+        function selectDayInStrip(idx) {
+            selectedDayIdx = idx;
+            renderAll();
+        }
+
+        function renderAll() {
+            if (!state) return;
+            checkAndPerformWeeklyRollover(state);
+
+            const isAdm = state.role === 'admin';
+            document.getElementById('header-greeting').textContent = `Hola, ${state.profile.name || state.username}`;
+            document.getElementById('header-avatar-letter').textContent = (state.profile.name || state.username || 'U').charAt(0).toUpperCase();
+            document.getElementById('header-friend-code').textContent = state.friendCode || '#PAU05';
+            document.getElementById('header-role-badge').classList.toggle('hidden', !isAdm);
+            document.getElementById('header-admin-crown').classList.toggle('hidden', !isAdm);
+            document.getElementById('admin-panel-container').classList.toggle('hidden', !isAdm);
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+            document.getElementById('current-date-label').textContent = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+            document.getElementById('current-week-label').textContent = `Semana del ${DAYS_FULL[selectedDayIdx]}`;
+
+            renderWeekStrip();
+            renderTodayHabitsAndStats();
+            renderWaterTracker();
+            renderGymRoutineCard();
+            renderMealsSection();
+            renderUniTab();
+            renderProgressTab();
+            renderSettingsTab();
+
+            lucide.createIcons();
+        }
+
+        function renderWeekStrip() {
+            const container = document.getElementById('week-strip-container');
+            if (!container) return;
+            const todayIdx = getTodayIndex();
+            let html = '';
+            DAYS_SHORT.forEach((dayName, idx) => {
+                const isSelected = idx === selectedDayIdx;
+                const isToday = idx === todayIdx;
+                const habitsCount = state.habits.length;
+                let completedCount = state.habits.filter(h => h.days[idx]).length;
+                const pct = habitsCount > 0 ? Math.round((completedCount / habitsCount) * 100) : 0;
+
+                html += `
+                    <button onclick="selectDayInStrip(${idx})"
+                        class="flex flex-col items-center justify-center p-2 rounded-2xl border transition active:scale-95 ${
+                            isSelected
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/30'
+                                : isToday
+                                    ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-600 dark:text-indigo-400'
+                                    : 'bg-slate-100/70 dark:bg-white/5 border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-slate-300'
+                        }">
+                        <span class="text-[10px] font-extrabold uppercase">${dayName}</span>
+                        <span class="text-sm font-black my-0.5">${pct}%</span>
+                        <span class="w-1.5 h-1.5 rounded-full ${pct === 100 ? 'bg-emerald-400' : pct > 0 ? 'bg-amber-400' : 'bg-transparent'}"></span>
+                    </button>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderTodayHabitsAndStats() {
+            const habits = state.habits || [];
+            const completedCount = habits.filter(h => h.days[selectedDayIdx]).length;
+            const totalCount = habits.length;
+            const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+            document.getElementById('today-progress-pct').textContent = `${pct}%`;
+            document.getElementById('today-completed-count').textContent = `${completedCount} de ${totalCount} completados`;
+            const ring = document.getElementById('today-progress-ring');
+            if (ring) ring.setAttribute('stroke-dasharray', `${pct}, 100`);
+
+            let maxStreak = 0;
+            habits.forEach(h => {
+                let currentStreak = h.baseStreak || 0;
+                for (let i = 0; i <= selectedDayIdx; i++) {
+                    if (h.days[i]) currentStreak++;
+                    else currentStreak = 0;
+                }
+                if (currentStreak > maxStreak) maxStreak = currentStreak;
+            });
+            document.getElementById('stat-max-streak').textContent = `${maxStreak} días 🔥`;
+
+            // Aviso examen urgente (SOLO EN PESTAÑA HOY)
+            const banner = document.getElementById('today-urgent-deadline-banner');
+            const bannerTxt = document.getElementById('today-urgent-deadline-text');
+            if (banner && bannerTxt) {
+                const pendingExams = (state.exams || []).filter(e => e.date >= getTodayISO()).sort((a,b) => a.date.localeCompare(b.date));
+                const pendingTasks = (state.tasks || []).filter(t => !t.done && t.date >= getTodayISO()).sort((a,b) => a.date.localeCompare(b.date));
+                if (pendingExams.length > 0) {
+                    const ex = pendingExams[0];
+                    banner.classList.remove('hidden');
+                    bannerTxt.textContent = `Examen próximo: "${ex.title}" (${ex.date})`;
+                } else if (pendingTasks.length > 0) {
+                    const tk = pendingTasks[0];
+                    banner.classList.remove('hidden');
+                    bannerTxt.textContent = `Entrega próxima: "${tk.title}" (${tk.date})`;
+                } else {
+                    banner.classList.add('hidden');
+                }
+            }
+
+            const listEl = document.getElementById('habits-list-container');
+            if (!listEl) return;
+            if (habits.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-400 py-3 text-center">No hay hábitos creados. Añade uno nuevo arriba.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = habits.map(h => {
+                const isChecked = h.days[selectedDayIdx];
+                return `
+                    <div class="p-3.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <button type="button" onclick="openHabitModal('${h.id}')" title="Editar hábito"
+                                class="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center text-xl shrink-0 active:scale-95 transition">
+                                ${h.emoji || '⚡'}
+                            </button>
+                            <div class="min-w-0">
+                                <h4 class="font-extrabold text-sm truncate">${escapeHTML(h.name)}</h4>
+                                <p class="text-[11px] text-slate-400 font-medium">Racha activa: ${h.baseStreak || 0} días 🔥</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" onclick="toggleHabitDay('${h.id}', ${selectedDayIdx})"
+                                class="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-white transition active:scale-90 shadow-sm ${
+                                    isChecked
+                                        ? 'bg-emerald-600 shadow-emerald-500/30'
+                                        : 'bg-slate-300 dark:bg-white/15 text-transparent'
+                                }">
+                                <i data-lucide="check" class="w-5 h-5 ${isChecked ? 'block' : 'hidden'}"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleHabitDay(habitId, dayIdx) {
+            const h = (state.habits || []).find(item => item.id === habitId);
+            if (!h) return;
+            h.days[dayIdx] = !h.days[dayIdx];
+
+            const allDone = state.habits.length > 0 && state.habits.every(item => item.days[dayIdx]);
+            if (allDone && typeof confetti === 'function') {
+                confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+                showToast('¡Todos los hábitos del día completados! 🎉🔥', 'emerald');
+            }
+
+            renderAll();
+            saveStateEverywhere();
+        }
+
+        function syncWaterHabitStatus(dayIdx) {
+            const glasses = (state.waterGlassesByDay || [])[dayIdx] || 0;
+            const targetLiters = Number(state.profile?.targetWaterLiters) || 2.5;
+            const targetGlasses = Math.max(1, Math.round(targetLiters / 0.25));
+            const waterHabit = (state.habits || []).find(h => h.id === 'h-water' || h.name.toLowerCase().includes('agua'));
+            if (waterHabit) {
+                const wasCompleted = waterHabit.days[dayIdx];
+                const isNowCompleted = glasses >= targetGlasses;
+                waterHabit.days[dayIdx] = isNowCompleted;
+                if (!wasCompleted && isNowCompleted) {
+                    showToast('¡Meta de hidratación cumplida! Hábito marcado automáticamente 💧✅', 'emerald');
+                }
+            }
+        }
+
+        function renderWaterTracker() {
+            const glassesToday = (state.waterGlassesByDay || [])[selectedDayIdx] || 0;
+            const targetLiters = Number(state.profile?.targetWaterLiters) || 2.5;
+            const targetGlasses = Math.max(1, Math.round(targetLiters / 0.25));
+            const litersToday = (glassesToday * 0.25).toFixed(2);
+
+            document.getElementById('water-goal-badge').textContent = `${glassesToday} / ${targetGlasses} vasos (${litersToday} / ${targetLiters} L)`;
+            const waterPct = Math.min(100, Math.round((glassesToday / targetGlasses) * 100));
+            document.getElementById('water-progress-bar').style.width = `${waterPct}%`;
+
+            const glassesGrid = document.getElementById('water-glasses-grid');
+            const totalSlots = Math.max(targetGlasses, glassesToday);
+            let glassesHTML = '';
+            for (let i = 1; i <= totalSlots; i++) {
+                const isFilled = i <= glassesToday;
+                glassesHTML += `
+                    <button onclick="setWaterGlassLevel(${i})"
+                        class="group relative h-14 rounded-2xl border overflow-hidden flex flex-col items-center justify-center transition active:scale-90 ${
+                            isFilled
+                                ? 'border-cyan-400/60 bg-cyan-500/10 shadow-sm'
+                                : 'border-slate-200 dark:border-white/10 bg-slate-100/70 dark:bg-white/[0.03]'
+                        }">
+                        <div class="absolute bottom-0 inset-x-0 bg-cyan-500/70 transition-all duration-300"
+                             style="height: ${isFilled ? '100% ' : '0%'}"></div>
+                        <span class="relative z-10 text-sm">${isFilled ? '💧' : '🥛'}</span>
+                        <span class="relative z-10 text-[9px] font-extrabold mt-0.5 ${isFilled ? 'text-slate-950 dark:text-white' : 'text-slate-400'}">
+                            ${(i * 0.25).toFixed(2)}L
+                        </span>
+                    </button>
+                `;
+            }
+            glassesGrid.innerHTML = glassesHTML;
+        }
+
+        function changeWaterGlasses(delta) {
+            if (!state.waterGlassesByDay) state.waterGlassesByDay = [0,0,0,0,0,0,0];
+            let current = state.waterGlassesByDay[selectedDayIdx] || 0;
+            current = Math.max(0, current + delta);
+            state.waterGlassesByDay[selectedDayIdx] = current;
+            syncWaterHabitStatus(selectedDayIdx);
+            renderAll();
+            saveStateEverywhere();
+        }
+
+        function setWaterGlassLevel(level) {
+            if (!state.waterGlassesByDay) state.waterGlassesByDay = [0,0,0,0,0,0,0];
+            state.waterGlassesByDay[selectedDayIdx] = level;
+            syncWaterHabitStatus(selectedDayIdx);
+            renderAll();
+            saveStateEverywhere();
+        }
+
+        function renderGymRoutineCard() {
+            if (!state.weeklyGymRoutine) state.weeklyGymRoutine = createUserAccount({}).weeklyGymRoutine;
+            const routine = state.weeklyGymRoutine[selectedDayIdx] || { title: 'Descanso', exercises: [] };
+            document.getElementById('gym-card-day-name').textContent = DAYS_FULL[selectedDayIdx];
+            document.getElementById('gym-card-routine-title').textContent = routine.title;
+
+            const listEl = document.getElementById('hoy-gym-exercises-list');
+            if (!listEl) return;
+            if (!routine.exercises || routine.exercises.length === 0) {
+                listEl.innerHTML = `<div class="col-span-full p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-xs text-slate-400 text-center">No hay ejercicios asignados para este día. Pulsa "Configurar Rutina".</div>`;
+                return;
+            }
+
+            listEl.innerHTML = routine.exercises.map((ex, idx) => `
+                <div class="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                    <div class="min-w-0"><p class="font-extrabold text-xs truncate">${escapeHTML(ex.name)}</p></div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <input type="text" value="${escapeHTML(ex.weight || '')}" onchange="updateGymExerciseWeight(${selectedDayIdx}, ${idx}, this.value)"
+                            class="w-20 px-2.5 py-1 rounded-xl bg-white dark:bg-black/40 border border-slate-200 dark:border-white/15 text-xs font-mono font-extrabold text-center">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateGymExerciseWeight(dayIdx, exIdx, newWeight) {
+            if (!state.weeklyGymRoutine[dayIdx] || !state.weeklyGymRoutine[dayIdx].exercises[exIdx]) return;
+            state.weeklyGymRoutine[dayIdx].exercises[exIdx].weight = newWeight;
+            saveStateEverywhere();
+            showToast('Peso actualizado y guardado 🏋️‍♂️', 'emerald');
+        }
+
+        function startGymRestTimer(seconds) {
+            if (gymRestInterval) clearInterval(gymRestInterval);
+            gymRestSecondsLeft = seconds;
+            updateGymRestDisplay();
+            showToast(`Descanso iniciado: ${seconds}s ⏱️`, 'indigo');
+
+            gymRestInterval = setInterval(() => {
+                gymRestSecondsLeft--;
+                updateGymRestDisplay();
+                if (gymRestSecondsLeft <= 0) {
+                    clearInterval(gymRestInterval);
+                    gymRestInterval = null;
+                    playTimerBeep();
+                    showToast('¡Tiempo de descanso terminado! A por la siguiente serie 💪', 'emerald');
+                }
+            }, 1000);
+        }
+
+        function stopGymRestTimer() {
+            if (gymRestInterval) clearInterval(gymRestInterval);
+            gymRestInterval = null;
+            gymRestSecondsLeft = 0;
+            updateGymRestDisplay();
+        }
+
+        function updateGymRestDisplay() {
+            const el = document.getElementById('gym-rest-timer-display');
+            if (!el) return;
+            const m = String(Math.floor(gymRestSecondsLeft / 60)).padStart(2, '0');
+            const s = String(gymRestSecondsLeft % 60).padStart(2, '0');
+            el.textContent = `${m}:${s}`;
+        }
+
+        function openGymRoutineModal() {
+            gymModalDayIdx = selectedDayIdx;
+            const modal = document.getElementById('gym-routine-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            renderGymModalDaysStrip();
+            loadGymModalDayData();
+        }
+
+        function closeGymRoutineModal() {
+            const modal = document.getElementById('gym-routine-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            renderAll();
+        }
+
+        function renderGymModalDaysStrip() {
+            const strip = document.getElementById('gym-modal-days-strip');
+            if (!strip) return;
+            strip.innerHTML = DAYS_SHORT.map((name, idx) => `
+                <button type="button" onclick="selectGymModalDay(${idx})"
+                    class="py-2 rounded-xl text-xs font-extrabold transition ${
+                        gymModalDayIdx === idx
+                            ? 'bg-indigo-600 text-white shadow'
+                            : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300'
+                    }">
+                    ${name}
+                </button>
+            `).join('');
+        }
+
+        function selectGymModalDay(idx) {
+            gymModalDayIdx = idx;
+            renderGymModalDaysStrip();
+            loadGymModalDayData();
+        }
+
+        function loadGymModalDayData() {
+            if (!state.weeklyGymRoutine) state.weeklyGymRoutine = createUserAccount({}).weeklyGymRoutine;
+            const routine = state.weeklyGymRoutine[gymModalDayIdx] || { title: '', exercises: [] };
+            document.getElementById('gym-modal-title-input').value = routine.title;
+
+            const listEl = document.getElementById('gym-modal-exercises-list');
+            if (!listEl) return;
+            if (!routine.exercises || routine.exercises.length === 0) {
+                listEl.innerHTML = `<p class="text-xs text-slate-400 py-2 text-center">No hay ejercicios este día.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = routine.exercises.map((ex, i) => `
+                <div class="p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                    <span class="text-xs font-bold truncate">${escapeHTML(ex.name)} (${escapeHTML(ex.weight || '0kg')})</span>
+                    <button type="button" onclick="deleteGymExercise(${gymModalDayIdx}, ${i})" class="text-rose-500 text-xs font-bold px-2 py-1">Eliminar</button>
+                </div>
+            `).join('');
+        }
+
+        function saveGymSessionTitle() {
+            const val = document.getElementById('gym-modal-title-input').value.trim();
+            if (!state.weeklyGymRoutine[gymModalDayIdx]) state.weeklyGymRoutine[gymModalDayIdx] = { title: '', exercises: [] };
+            state.weeklyGymRoutine[gymModalDayIdx].title = val;
+            saveStateEverywhere();
+            showToast('Título de rutina guardado', 'emerald');
+        }
+
+        function handleAddGymExercise(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-gym-ex-name').value.trim();
+            const weight = document.getElementById('new-gym-ex-weight').value.trim();
+            if (!name) return;
+
+            if (!state.weeklyGymRoutine[gymModalDayIdx]) state.weeklyGymRoutine[gymModalDayIdx] = { title: '', exercises: [] };
+            state.weeklyGymRoutine[gymModalDayIdx].exercises.push({ name, weight: weight || 'Corporal' });
+            document.getElementById('new-gym-ex-name').value = '';
+            document.getElementById('new-gym-ex-weight').value = '';
+            loadGymModalDayData();
+            saveStateEverywhere();
+            showToast('Ejercicio añadido', 'emerald');
+        }
+
+        function deleteGymExercise(dayIdx, exIdx) {
+            if (!state.weeklyGymRoutine[dayIdx]) return;
+            state.weeklyGymRoutine[dayIdx].exercises.splice(exIdx, 1);
+            loadGymModalDayData();
+            saveStateEverywhere();
+        }
+
+        function selectMealType(type) {
+            selectedMealType = type;
+            const container = document.getElementById('meal-type-pills');
+            if (!container) return;
+            const btns = container.querySelectorAll('button');
+            btns.forEach(b => {
+                const isSelected = b.textContent.trim() === type;
+                b.className = isSelected
+                    ? 'py-2 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow'
+                    : 'py-2 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300';
+            });
+        }
+
+        function calculateMacrosAutomatically() {
+            const desc = document.getElementById('meal-desc-input').value.trim().toLowerCase();
+            if (!desc) {
+                showToast('Escribe primero qué has comido', 'amber');
+                return;
+            }
+            let kcal = 450, prot = 35, carb = 40, fat = 14;
+            if (desc.includes('pollo') || desc.includes('ternera') || desc.includes('atún')) { prot += 15; kcal += 100; }
+            if (desc.includes('arroz') || desc.includes('pasta') || desc.includes('patata') || desc.includes('avena')) { carb += 35; kcal += 150; }
+            if (desc.includes('huevo') || desc.includes('aguacate') || desc.includes('aceite')) { fat += 12; kcal += 120; }
+
+            document.getElementById('meal-kcal-input').value = kcal;
+            document.getElementById('meal-prot-input').value = prot;
+            document.getElementById('meal-carb-input').value = carb;
+            document.getElementById('meal-fat-input').value = fat;
+            showToast('Macros estimados automáticamente ✨', 'emerald');
+        }
+
+        function saveMealEntry(e) {
+            e.preventDefault();
+            const desc = document.getElementById('meal-desc-input').value.trim();
+            const kcal = Number(document.getElementById('meal-kcal-input').value) || 0;
+            const prot = Number(document.getElementById('meal-prot-input').value) || 0;
+            const carb = Number(document.getElementById('meal-carb-input').value) || 0;
+            const fat = Number(document.getElementById('meal-fat-input').value) || 0;
+            const saveFav = document.getElementById('meal-save-favorite').checked;
+
+            if (!desc) return;
+
+            const dateKey = getTodayISO();
+            if (!state.mealsByDay) state.mealsByDay = {};
+            if (!state.mealsByDay[dateKey]) state.mealsByDay[dateKey] = [];
+
+            const entry = { id: 'm-' + Date.now(), type: selectedMealType, name: desc, kcal, prot, carb, fat };
+            state.mealsByDay[dateKey].push(entry);
+
+            if (saveFav) {
+                if (!state.favoriteMeals) state.favoriteMeals = [];
+                state.favoriteMeals.push({ type: selectedMealType, name: desc, kcal, prot, carb, fat });
+            }
+
+            document.getElementById('meal-desc-input').value = '';
+            document.getElementById('meal-kcal-input').value = '';
+            document.getElementById('meal-prot-input').value = '';
+            document.getElementById('meal-carb-input').value = '';
+            document.getElementById('meal-fat-input').value = '';
+            document.getElementById('meal-save-favorite').checked = false;
+
+            renderMealsSection();
+            saveStateEverywhere();
+            showToast('Comida registrada 🍽️', 'emerald');
+        }
+
+        function quickAddFavoriteMeal(favIdx) {
+            if (!state.favoriteMeals || !state.favoriteMeals[favIdx]) return;
+            const fm = state.favoriteMeals[favIdx];
+            const dateKey = getTodayISO();
+            if (!state.mealsByDay) state.mealsByDay = {};
+            if (!state.mealsByDay[dateKey]) state.mealsByDay[dateKey] = [];
+
+            state.mealsByDay[dateKey].push({ id: 'm-' + Date.now(), type: fm.type, name: fm.name, kcal: fm.kcal, prot: fm.prot, carb: fm.carb, fat: fm.fat });
+            renderMealsSection();
+            saveStateEverywhere();
+            showToast(`Añadido: ${fm.name}`, 'emerald');
+        }
+
+        function deleteFavoriteMeal(favIdx) {
+            if (!state.favoriteMeals) return;
+            state.favoriteMeals.splice(favIdx, 1);
+            renderMealsSection();
+            saveStateEverywhere();
+            showToast('Plato favorito eliminado', 'amber');
+        }
+
+        function deleteMealEntry(mealId) {
+            const dateKey = getTodayISO();
+            if (!state.mealsByDay || !state.mealsByDay[dateKey]) return;
+            state.mealsByDay[dateKey] = state.mealsByDay[dateKey].filter(m => m.id !== mealId);
+            renderMealsSection();
+            saveStateEverywhere();
+        }
+
+        function renderMealsSection() {
+            const dateKey = getTodayISO();
+            const meals = (state.mealsByDay || {})[dateKey] || [];
+            const targetKcal = state.profile.targetKcal || 2400;
+
+            let totalK = 0, totalP = 0, totalC = 0, totalF = 0;
+            meals.forEach(m => { totalK += m.kcal; totalP += m.prot; totalC += m.carb; totalF += m.fat; });
+
+            document.getElementById('meals-total-kcal').textContent = `${totalK} / ${targetKcal} kcal`;
+            const pctKcal = Math.min(100, Math.round((totalK / targetKcal) * 100));
+            document.getElementById('meals-kcal-ratio').textContent = `${pctKcal}% de tu objetivo`;
+            document.getElementById('meals-kcal-bar').style.width = `${pctKcal}%`;
+
+            document.getElementById('macro-prot-sum').textContent = `${totalP}g`;
+            document.getElementById('macro-carb-sum').textContent = `${totalC}g`;
+            document.getElementById('macro-fat-sum').textContent = `${totalF}g`;
+
+            const favGrid = document.getElementById('favorite-meals-grid');
+            if (favGrid) {
+                if (!state.favoriteMeals || state.favoriteMeals.length === 0) {
+                    favGrid.innerHTML = `<p class="text-xs text-slate-400 py-2">No hay platos favoritos guardados.</p>`;
+                } else {
+                    favGrid.innerHTML = state.favoriteMeals.map((fm, idx) => `
+                        <div class="p-2.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                            <button type="button" onclick="quickAddFavoriteMeal(${idx})" class="text-left min-w-0 flex-1 active:scale-95 transition">
+                                <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500">${escapeHTML(fm.type)}</span>
+                                <p class="font-extrabold text-xs truncate mt-0.5">${escapeHTML(fm.name)}</p>
+                                <p class="text-[10px] text-slate-400 font-semibold">${fm.kcal} kcal · ${fm.prot}g P</p>
+                            </button>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button type="button" onclick="quickAddFavoriteMeal(${idx})" title="Añadir" class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center active:scale-90 transition">
+                                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button type="button" onclick="deleteFavoriteMeal(${idx})" title="Quitar favorito" class="w-7 h-8 rounded-xl text-slate-400 hover:text-rose-500 flex items-center justify-center active:scale-90 transition">
+                                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            const listEl = document.getElementById('today-meals-list');
+            if (listEl) {
+                if (meals.length === 0) {
+                    listEl.innerHTML = `<p class="text-xs text-slate-400 py-2 text-center">No has registrado ninguna comida hoy.</p>`;
+                } else {
+                    listEl.innerHTML = meals.map(m => `
+                        <div class="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-500">${escapeHTML(m.type)}</span>
+                                    <p class="font-extrabold text-xs truncate">${escapeHTML(m.name)}</p>
+                                </div>
+                                <p class="text-[11px] text-slate-400 mt-1 font-semibold">${m.kcal} kcal · <span class="text-emerald-500">${m.prot}g P</span> · ${m.carb}g C · ${m.fat}g G</p>
+                            </div>
+                            <button onclick="deleteMealEntry('${m.id}')" class="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center shrink-0 active:scale-90 transition">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function switchUniSubView(sub) {
+            activeUniSubView = sub;
+            const isT = sub === 'tareas';
+            document.getElementById('unisub-tareas').classList.toggle('hidden', !isT);
+            document.getElementById('unisub-examenes').classList.toggle('hidden', isT);
+            document.getElementById('unitab-btn-tareas').className = isT ? 'py-2.5 rounded-xl bg-indigo-600 text-white shadow transition' : 'py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition';
+            document.getElementById('unitab-btn-examenes').className = !isT ? 'py-2.5 rounded-xl bg-indigo-600 text-white shadow transition' : 'py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition';
+        }
+
+        function setPomodoroMode(m) {
+            pomodoroMode = m;
+            pomodoroSecondsLeft = m === 'focus' ? 25 * 60 : 5 * 60;
+            document.getElementById('pomomode-focus').className = m === 'focus' ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow' : 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400';
+            document.getElementById('pomomode-break').className = m === 'break' ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-purple-600 text-white shadow' : 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400';
+            document.getElementById('pomodoro-status-text').textContent = m === 'focus' ? 'Tiempo de concentración (25 min)' : 'Tiempo de descanso (5 min)';
+            updatePomodoroDisplay();
+        }
+
+        function togglePomodoroTimer() {
+            if (pomodoroInterval) {
+                clearInterval(pomodoroInterval);
+                pomodoroInterval = null;
+                document.getElementById('pomodoro-start-btn').textContent = '▶️ Reanudar';
+                return;
+            }
+            document.getElementById('pomodoro-start-btn').textContent = '⏸️ Pausar';
+            pomodoroInterval = setInterval(() => {
+                pomodoroSecondsLeft--;
+                updatePomodoroDisplay();
+                if (pomodoroSecondsLeft <= 0) {
+                    clearInterval(pomodoroInterval);
+                    pomodoroInterval = null;
+                    document.getElementById('pomodoro-start-btn').textContent = '▶️ Iniciar Enfoque';
+                    playTimerBeep();
+                    if (pomodoroMode === 'focus') {
+                        state.studyMinutesWeek = (state.studyMinutesWeek || 0) + 25;
+                        saveStateEverywhere();
+                        showToast('¡Pomodoro completado! +25 min de estudio 🎓', 'emerald');
+                    } else {
+                        showToast('Descanso terminado. ¡A estudiar!', 'indigo');
+                    }
+                    setPomodoroMode(pomodoroMode === 'focus' ? 'break' : 'focus');
+                }
+            }, 1000);
+        }
+
+        function resetPomodoroTimer() {
+            if (pomodoroInterval) clearInterval(pomodoroInterval);
+            pomodoroInterval = null;
+            document.getElementById('pomodoro-start-btn').textContent = '▶️ Iniciar Enfoque';
+            setPomodoroMode(pomodoroMode);
+        }
+
+        function updatePomodoroDisplay() {
+            const m = String(Math.floor(pomodoroSecondsLeft / 60)).padStart(2, '0');
+            const s = String(pomodoroSecondsLeft % 60).padStart(2, '0');
+            document.getElementById('pomodoro-timer-display').textContent = `${m}:${s}`;
+        }
+
+        function handleAddTask(e) {
+            e.preventDefault();
+            const title = document.getElementById('task-title-input').value.trim();
+            const date = document.getElementById('task-date-input').value;
+            if (!title || !date) return;
+
+            if (!state.tasks) state.tasks = [];
+            state.tasks.push({ id: 't-' + Date.now(), title, date, done: false });
+            document.getElementById('task-title-input').value = '';
+            document.getElementById('task-date-input').value = '';
+            renderUniTab();
+            saveStateEverywhere();
+            showToast('Tarea añadida correctamente', 'emerald');
+        }
+
+        function toggleTaskDone(taskId) {
+            if (!state.tasks) return;
+            const t = state.tasks.find(item => item.id === taskId);
+            if (t) {
+                t.done = !t.done;
+                renderUniTab();
+                saveStateEverywhere();
+            }
+        }
+
+        function deleteTask(taskId) {
+            if (!state.tasks) return;
+            state.tasks = state.tasks.filter(t => t.id !== taskId);
+            renderUniTab();
+            saveStateEverywhere();
+        }
+
+        function setTaskFilter(filter) {
+            taskFilter = filter;
+            document.getElementById('filter-btn-pending').className = filter === 'pending' ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white' : 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400';
+            document.getElementById('filter-btn-all').className = filter === 'all' ? 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white' : 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-200 dark:bg-white/10 text-slate-400';
+            renderUniTab();
+        }
+
+        function changeCalendarMonth(delta) {
+            calendarViewDate.setMonth(calendarViewDate.getMonth() + delta);
+            renderUniTab();
+        }
+
+        function prefillExamDate(isoDate) {
+            const input = document.getElementById('exam-date-input');
+            if (input) input.value = isoDate;
+            switchUniSubView('examenes');
+        }
+
+        function handleAddExam(e) {
+            e.preventDefault();
+            const title = document.getElementById('exam-title-input').value.trim();
+            const date = document.getElementById('exam-date-input').value;
+            if (!title || !date) return;
+
+            if (!state.exams) state.exams = [];
+            state.exams.push({ id: 'ex-' + Date.now(), title, date });
+            document.getElementById('exam-title-input').value = '';
+            document.getElementById('exam-date-input').value = '';
+            renderUniTab();
+            saveStateEverywhere();
+            showToast('Examen programado 📅', 'emerald');
+        }
+
+        function deleteExam(examId) {
+            if (!state.exams) return;
+            state.exams = state.exams.filter(e => e.id !== examId);
+            renderUniTab();
+            saveStateEverywhere();
+        }
+
+        function renderUniTab() {
+            const tasksListEl = document.getElementById('tasks-list-container');
+            if (tasksListEl) {
+                let tasks = state.tasks || [];
+                if (taskFilter === 'pending') tasks = tasks.filter(t => !t.done);
+                if (tasks.length === 0) {
+                    tasksListEl.innerHTML = `<p class="text-xs text-slate-400 py-3 text-center">No hay tareas que mostrar.</p>`;
+                } else {
+                    tasksListEl.innerHTML = tasks.map(t => `
+                        <div class="p-3.5 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <button onclick="toggleTaskDone('${t.id}')" class="w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${t.done ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 dark:border-white/20'}">
+                                    <i data-lucide="check" class="w-3.5 h-3.5 ${t.done ? 'block' : 'hidden'}"></i>
+                                </button>
+                                <div class="min-w-0">
+                                    <p class="font-extrabold text-xs truncate ${t.done ? 'line-through text-slate-400' : ''}">${escapeHTML(t.title)}</p>
+                                    <span class="text-[10px] text-slate-400 font-bold">Fecha límite: ${t.date}</span>
+                                </div>
+                            </div>
+                            <button onclick="deleteTask('${t.id}')" class="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-500 flex items-center justify-center shrink-0">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            const year = calendarViewDate.getFullYear();
+            const month = calendarViewDate.getMonth();
+            const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            document.getElementById('calendar-month-title').textContent = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const calGrid = document.getElementById('exam-calendar-grid');
+            if (calGrid) {
+                let html = '';
+                for (let i = 0; i < adjustedFirstDay; i++) { html += `<div></div>`; }
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const isoDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const hasExam = (state.exams || []).some(ex => ex.date === isoDate);
+                    const isToday = isoDate === getTodayISO();
+
+                    html += `
+                        <button onclick="prefillExamDate('${isoDate}')"
+                            class="h-10 rounded-xl font-extrabold text-xs flex flex-col items-center justify-center transition active:scale-95 ${
+                                hasExam
+                                    ? 'bg-amber-500 text-slate-950 font-black shadow-sm'
+                                    : isToday
+                                        ? 'bg-indigo-600 text-white shadow'
+                                        : 'bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300'
+                            }">
+                            <span>${d}</span>
+                            <span class="w-1 h-1 rounded-full ${hasExam ? 'bg-slate-950' : 'bg-transparent'} mt-0.5"></span>
+                        </button>
+                    `;
+                }
+                calGrid.innerHTML = html;
+            }
+
+            const examsListEl = document.getElementById('exams-list-container');
+            if (examsListEl) {
+                const exams = state.exams || [];
+                if (exams.length === 0) {
+                    examsListEl.innerHTML = `<p class="text-xs text-slate-400 py-2 text-center">No hay exámenes programados.</p>`;
+                } else {
+                    examsListEl.innerHTML = exams.map(ex => `
+                        <div class="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                            <div>
+                                <p class="font-extrabold text-xs">${escapeHTML(ex.title)}</p>
+                                <span class="text-[10px] text-amber-500 font-extrabold">📅 Fecha: ${ex.date}</span>
+                            </div>
+                            <button onclick="deleteExam('${ex.id}')" class="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-500 flex items-center justify-center shrink-0">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function switchProgressSubView(sub) {
+            activeProgressSubView = sub;
+            ['amigos', 'fisico', 'estadisticas'].forEach(s => {
+                document.getElementById(`progsub-${s}`).classList.toggle('hidden', s !== sub);
+                const btn = document.getElementById(`progtab-btn-${s}`);
+                if (btn) {
+                    btn.className = s === sub ? 'py-2.5 rounded-xl bg-indigo-600 text-white shadow transition' : 'py-2.5 rounded-xl text-slate-600 dark:text-slate-300 transition';
+                }
+            });
+            if (sub === 'estadisticas') renderCharts();
+        }
+
+        function copyMyFriendCode() {
+            const code = state.friendCode || '#PAU05';
+            const temp = document.createElement('textarea');
+            temp.value = code;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showToast(`¡Código ${code} copiado! 📋`, 'emerald');
+        }
+
+        function handleAddFriendByCode() {
+            const input = document.getElementById('friend-code-input');
+            const code = (input?.value || '').trim().toUpperCase();
+            if (!code) return;
+
+            const targetUser = Object.values(globalStore.users).find(u => u.friendCode && u.friendCode.toUpperCase() === code);
+            if (!targetUser) {
+                showToast('No se encontró ningún usuario con ese código', 'rose');
+                return;
+            }
+            if (targetUser.id === state.id) {
+                showToast('Ese es tu propio código de amigo', 'amber');
+                return;
+            }
+            if (!state.friends) state.friends = [];
+            if (state.friends.includes(targetUser.id)) {
+                showToast('Ya tienes agregado a este amigo', 'amber');
+                return;
+            }
+
+            state.friends.push(targetUser.id);
+            input.value = '';
+            renderProgressTab();
+            saveStateEverywhere();
+            showToast(`¡Amigo @${targetUser.username} añadido con éxito! 🏆`, 'emerald');
+        }
+
+        function removeFriendByCode(friendId) {
+            if (!state.friends) return;
+            state.friends = state.friends.filter(id => id !== friendId);
+            renderProgressTab();
+            saveStateEverywhere();
+            showToast('Amigo eliminado del ranking', 'amber');
+        }
+
+        function previewSelectedPhysiquePhoto(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingPhysiqueDataUrl = e.target.result;
+                const prevImg = document.getElementById('physique-preview-img');
+                prevImg.src = pendingPhysiqueDataUrl;
+                document.getElementById('physique-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleAddProgressPhoto() {
+            const weightInput = document.getElementById('physique-photo-weight');
+            const weightVal = Number(weightInput.value) || state.profile.weight || 75;
+            if (!pendingPhysiqueDataUrl) {
+                pendingPhysiqueDataUrl = makeDefaultPhysiqueSVG('Check Físico', `${weightVal}kg`, '#6366f1');
+            }
+
+            if (!state.physiquePhotos) state.physiquePhotos = [];
+            state.physiquePhotos.push({
+                id: 'ph-' + Date.now(),
+                date: getTodayISO(),
+                weight: weightVal,
+                dataUrl: pendingPhysiqueDataUrl
+            });
+
+            if (!state.weightHistory) state.weightHistory = [];
+            state.weightHistory.push({ date: getTodayISO(), weight: weightVal });
+            state.profile.weight = weightVal;
+
+            pendingPhysiqueDataUrl = '';
+            document.getElementById('physique-preview-container').classList.add('hidden');
+            document.getElementById('physique-photo-file').value = '';
+            weightInput.value = '';
+
+            renderProgressTab();
+            saveStateEverywhere();
+            showToast('Foto de progreso guardada 📸', 'emerald');
+        }
+
+        function makeDefaultPhysiqueSVG(label, weightText, accentHex) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500" viewBox="0 0 400 500">
+                <rect width="400" height="500" fill="#18181b"/>
+                <circle cx="200" cy="140" r="42" fill="${accentHex}" opacity="0.85"/>
+                <rect x="145" y="195" width="110" height="150" rx="26" fill="${accentHex}" opacity="0.7"/>
+                <text x="200" y="420" text-anchor="middle" fill="#ffffff" font-family="Inter, sans-serif" font-weight="800" font-size="22">${label} · ${weightText}</text>
+            </svg>`;
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+        }
+
+        function deletePhysiquePhoto(photoId) {
+            if (!state.physiquePhotos) return;
+            state.physiquePhotos = state.physiquePhotos.filter(p => p.id !== photoId);
+            renderProgressTab();
+            saveStateEverywhere();
+            showToast('Foto eliminada', 'amber');
+        }
+
+        function renderPhysiqueComparison() {
+            const beforeId = document.getElementById('compare-before-select').value;
+            const afterId = document.getElementById('compare-after-select').value;
+            const view = document.getElementById('physique-comparison-view');
+            if (!view) return;
+
+            const photos = state.physiquePhotos || [];
+            const pBefore = photos.find(p => p.id === beforeId);
+            const pAfter = photos.find(p => p.id === afterId);
+
+            if (!pBefore || !pAfter) {
+                view.innerHTML = `<div class="col-span-2 text-center p-3 text-xs text-slate-400">Selecciona dos fotos para comparar tu evolución.</div>`;
+                return;
+            }
+
+            view.innerHTML = `
+                <div class="relative rounded-2xl overflow-hidden bg-slate-900 border border-white/10">
+                    <img src="${pBefore.dataUrl}" alt="Antes" class="w-full h-48 object-cover">
+                    <div class="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/75 text-[10px] font-extrabold text-white">ANTES · ${pBefore.weight}kg (${pBefore.date})</div>
+                </div>
+                <div class="relative rounded-2xl overflow-hidden bg-slate-900 border border-white/10">
+                    <img src="${pAfter.dataUrl}" alt="Después" class="w-full h-48 object-cover">
+                    <div class="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-black/75 text-[10px] font-extrabold text-white">DESPUÉS · ${pAfter.weight}kg (${pAfter.date})</div>
+                </div>
+            `;
+        }
+
+        function renderProgressTab() {
+            document.getElementById('my-friend-code-badge').textContent = state.friendCode || '#PAU05';
+
+            const rankingList = document.getElementById('friends-ranking-list');
+            if (rankingList) {
+                const friendsIds = state.friends || [];
+                const allParticipants = [state, ...friendsIds.map(id => globalStore.users[id]).filter(Boolean)];
+                
+                allParticipants.sort((a, b) => {
+                    const scoreA = (a.habits || []).filter(h => h.days.some(Boolean)).length;
+                    const scoreB = (b.habits || []).filter(h => h.days.some(Boolean)).length;
+                    return scoreB - scoreA;
+                });
+
+                rankingList.innerHTML = allParticipants.map((u, idx) => {
+                    const isMe = u.id === state.id;
+                    const habitsDone = (u.habits || []).filter(h => h.days.some(Boolean)).length;
+                    const medals = ['🥇', '🥈', '🥉'];
+                    return `
+                        <div class="p-3.5 rounded-2xl flex items-center justify-between border transition ${
+                            isMe ? 'bg-indigo-600/15 border-indigo-500' : 'bg-slate-100 dark:bg-white/5 border-transparent'
+                        }">
+                            <div class="flex items-center gap-3">
+                                <span class="w-7 text-center font-black text-sm">${medals[idx] || (idx + 1) + 'º'}</span>
+                                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold flex items-center justify-center text-xs">
+                                    ${(u.profile.name || u.username || 'U').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p class="font-extrabold text-xs flex items-center gap-1">
+                                        <span>${escapeHTML(u.profile.name)}</span>
+                                        ${isMe ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500 text-white">Tú</span>' : ''}
+                                    </p>
+                                    <span class="text-[10px] text-slate-400 font-mono">@${escapeHTML(u.username)} · ${u.friendCode}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-emerald-500">${habitsDone} hábitos activos</span>
+                                ${!isMe ? `<button onclick="removeFriendByCode('${u.id}')" class="text-slate-400 hover:text-rose-500 text-xs font-bold px-1">×</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            const photos = state.physiquePhotos || [];
+            const beforeSel = document.getElementById('compare-before-select');
+            const afterSel = document.getElementById('compare-after-select');
+            if (beforeSel && afterSel) {
+                const optionsHTML = `<option value="">Seleccionar check...</option>` + photos.map(p => `<option value="${p.id}">${p.date} (${p.weight} kg)</option>`).join('');
+                beforeSel.innerHTML = optionsHTML;
+                afterSel.innerHTML = optionsHTML;
+            }
+
+            const strip = document.getElementById('physique-gallery-strip');
+            if (strip) {
+                if (photos.length === 0) {
+                    strip.innerHTML = `<p class="text-xs text-slate-400 py-2">Aún no hay fotos en tu galería de progreso.</p>`;
+                } else {
+                    strip.innerHTML = photos.map(p => `
+                        <div class="relative w-28 shrink-0 rounded-2xl overflow-hidden bg-slate-900 border border-white/10 group">
+                            <img src="${p.dataUrl}" alt="${escapeHTML(p.date)}" class="w-full h-28 object-cover">
+                            <button type="button" onclick="deletePhysiquePhoto('${p.id}')" title="Borrar"
+                                class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/80 text-rose-400 flex items-center justify-center text-xs font-bold">×</button>
+                            <div class="p-1.5 text-[10px]">
+                                <span class="font-extrabold block text-white">${p.weight} kg</span>
+                                <span class="text-slate-400 block">${p.date}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function renderCharts() {
+            const ctx1 = document.getElementById('weekly-chart')?.getContext('2d');
+            if (ctx1) {
+                if (weeklyChartInstance) weeklyChartInstance.destroy();
+                const dataCounts = DAYS_SHORT.map((_, idx) => (state.habits || []).filter(h => h.days[idx]).length);
+                weeklyChartInstance = new Chart(ctx1, {
+                    type: 'bar',
+                    data: { labels: DAYS_SHORT, datasets: [{ label: 'Hábitos Cumplidos', data: dataCounts, backgroundColor: '#6366f1', borderRadius: 8 }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            const ctx2 = document.getElementById('weight-chart')?.getContext('2d');
+            if (ctx2) {
+                if (weightChartInstance) weightChartInstance.destroy();
+                const hist = state.weightHistory || [{ date: getTodayISO(), weight: state.profile.weight || 75 }];
+                weightChartInstance = new Chart(ctx2, {
+                    type: 'line',
+                    data: { labels: hist.map(h => h.date), datasets: [{ label: 'Peso (kg)', data: hist.map(h => h.weight), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            const ctx3 = document.getElementById('streaks-chart')?.getContext('2d');
+            if (ctx3) {
+                if (streaksChartInstance) streaksChartInstance.destroy();
+                const habits = state.habits || [];
+                streaksChartInstance = new Chart(ctx3, {
+                    type: 'doughnut',
+                    data: { labels: habits.map(h => h.name), datasets: [{ data: habits.map(h => h.baseStreak || 1), backgroundColor: ['#6366f1', '#10b981', '#a855f7', '#f59e0b', '#f43f5e'] }] },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        }
+
+        function renderSettingsTab() {
+            document.getElementById('prof-name').value = state.profile.name || '';
+            document.getElementById('prof-age').value = state.profile.age || 22;
+            document.getElementById('prof-weight').value = state.profile.weight || 75;
+            document.getElementById('prof-height').value = state.profile.height || 178;
+            document.getElementById('prof-target-kcal').value = state.profile.targetKcal || 2200;
+            document.getElementById('prof-target-prot').value = state.profile.targetProtein || 150;
+            document.getElementById('prof-target-water').value = state.profile.targetWaterLiters || 2.5;
+
+            document.getElementById('settings-active-account-sub').textContent = `Sesión iniciada como @${state.username || state.profile.name}`;
+            const hasFaceId = Boolean(state.faceIdCredentialId);
+            document.getElementById('settings-faceid-status').textContent = hasFaceId ? 'Face ID: Vinculado ✅' : 'Face ID: No vinculado ❌';
+
+            if (state.role === 'admin') {
+                const adminList = document.getElementById('admin-users-list');
+                if (adminList) {
+                    const usersArr = Object.values(globalStore.users);
+                    adminList.innerHTML = usersArr.map(u => `
+                        <div class="p-3 rounded-2xl bg-white dark:bg-black/40 border border-amber-500/30 flex items-center justify-between">
+                            <div>
+                                <p class="font-extrabold text-xs flex items-center gap-1.5">
+                                    <span>${escapeHTML(u.profile.name)}</span>
+                                    <span class="text-[10px] text-indigo-500 font-mono">@${escapeHTML(u.username)}</span>
+                                    ${u.role === 'admin' ? '<span>👑</span>' : ''}
+                                </p>
+                                <span class="text-[10px] text-slate-400 font-mono">Código: ${u.friendCode} · PIN: ${u.pin}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button onclick="adminSwitchDirectlyToUser('${u.id}')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[10px] font-bold">Entrar</button>
+                                ${u.id !== state.id ? `<button onclick="adminDeleteUser('${u.id}')" class="px-2 py-1 rounded-lg bg-rose-500/20 text-rose-500 text-[10px] font-bold">Borrar</button>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+
+        function recalculateRecommendedTargets() {
+            const w = Number(document.getElementById('prof-weight').value) || 75;
+            document.getElementById('prof-target-kcal').value = Math.round(w * 30);
+            document.getElementById('prof-target-prot').value = Math.round(w * 2);
+        }
+
+        function handleSaveProfile(e) {
+            e.preventDefault();
+            state.profile.name = document.getElementById('prof-name').value.trim();
+            state.profile.age = Number(document.getElementById('prof-age').value) || 22;
+            state.profile.weight = Number(document.getElementById('prof-weight').value) || 75;
+            state.profile.height = Number(document.getElementById('prof-height').value) || 178;
+            state.profile.targetKcal = Number(document.getElementById('prof-target-kcal').value) || 2200;
+            state.profile.targetProtein = Number(document.getElementById('prof-target-prot').value) || 150;
+            state.profile.targetWaterLiters = Number(document.getElementById('prof-target-water').value) || 2.5;
+
+            renderAll();
+            saveStateEverywhere();
+            showToast('Perfil actualizado correctamente ✨', 'emerald');
+        }
+
+        function handleChangePassword(e) {
+            e.preventDefault();
+            const newPass = document.getElementById('settings-new-pass').value.trim();
+            if (newPass.length < 4) {
+                showToast('La contraseña debe tener al menos 4 caracteres', 'amber');
+                return;
+            }
+            state.pin = newPass;
+            document.getElementById('settings-new-pass').value = '';
+            saveStateEverywhere();
+            showToast('¡Contraseña actualizada con éxito! 🔑', 'emerald');
+        }
+
+        // Lock Screen & Auth
+        function showLockScreenError(message) {
+            const box = document.getElementById('lock-error-box');
+            const txt = document.getElementById('lock-error-text');
+            if (box && txt) {
+                txt.textContent = message;
+                box.classList.remove('hidden');
+                box.classList.remove('animate-shake');
+                void box.offsetWidth;
+                box.classList.add('animate-shake');
+            }
+            showToast(message, 'rose');
+        }
+
+        function switchLockScreenTab(tab) {
+            const isLogin = tab === 'login';
+            document.getElementById('lock-form-login').classList.toggle('hidden', !isLogin);
+            document.getElementById('lock-form-register').classList.toggle('hidden', isLogin);
+            document.getElementById('lock-error-box').classList.add('hidden');
+            document.getElementById('lock-tab-login').className = isLogin ? 'py-2.5 rounded-xl bg-indigo-600 text-white shadow transition' : 'py-2.5 rounded-xl text-slate-500 dark:text-slate-300 transition';
+            document.getElementById('lock-tab-register').className = !isLogin ? 'py-2.5 rounded-xl bg-emerald-600 text-white shadow transition' : 'py-2.5 rounded-xl text-slate-500 dark:text-slate-300 transition';
+        }
+
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function findUserByUsernameOrCode(rawInput) {
+            const clean = (rawInput || '').trim().toLowerCase();
+            if (!clean) return null;
+            syncActiveUserPointer();
+            if (clean === 'paaauf' || clean === 'pau' || clean === 'pau forner' || clean === '#pau05' || clean === 'pau05') {
+                return globalStore.users['u-admin'];
+            }
+            return Object.values(globalStore.users).find(u =>
+                (u.username && u.username.trim().toLowerCase() === clean) ||
+                (u.profile?.name && u.profile.name.trim().toLowerCase() === clean) ||
+                (u.friendCode && u.friendCode.trim().toLowerCase() === clean) ||
+                (u.friendCode && u.friendCode.replace('#', '').trim().toLowerCase() === clean)
+            );
+        }
+
+        async function handleLockScreenLogin(e) {
+            if (e) e.preventDefault();
+            try {
+                const userEl = document.getElementById('lock-username-input');
+                const passEl = document.getElementById('lock-password-input');
+                const remEl = document.getElementById('lock-remember-device');
+
+                const usernameVal = (userEl ? userEl.value : '').trim();
+                const passVal = (passEl ? passEl.value : '').trim();
+                const remember = remEl ? remEl.checked : false;
+
+                const targetUser = findUserByUsernameOrCode(usernameVal);
+                if (!targetUser) {
+                    showLockScreenError('Usuario no encontrado. Usa "paaauf" o crea una cuenta.');
+                    return;
+                }
+
+                const cleanPass = passVal.toLowerCase();
+                const storedPin = String(targetUser.pin || '').trim();
+                const isMasterAdminPass = (targetUser.id === 'u-admin' && cleanPass === '31pau120520');
+
+                if (passVal !== storedPin && cleanPass !== storedPin.toLowerCase() && !isMasterAdminPass) {
+                    showLockScreenError('Contraseña incorrecta. Revisa que esté bien escrita.');
+                    return;
+                }
+
+                if (isMasterAdminPass) {
+                    targetUser.pin = '31pau120520';
+                }
+
+                const errBox = document.getElementById('lock-error-box');
+                if (errBox) errBox.classList.add('hidden');
+                if (passEl) passEl.value = '';
+                isSessionUnlocked = true;
+
+                if (remember) {
+                    localStorage.setItem(REMEMBER_SESSION_KEY, targetUser.id);
+                } else {
+                    localStorage.removeItem(REMEMBER_SESSION_KEY);
+                }
+
+                const overlay = document.getElementById('lock-screen-overlay');
+                if (overlay) {
+                    overlay.classList.add('hidden');
+                    overlay.style.display = 'none';
+                }
+
+                globalStore.currentUserId = targetUser.id;
+                syncActiveUserPointer();
+                renderAll();
+                showToast(`Bienvenido, ${targetUser.profile.name} 👋`, 'emerald');
+                saveStateEverywhere();
+            } catch (err) {
+                console.error(err);
+                showLockScreenError('Error al iniciar sesión. Inténtalo de nuevo.');
+            }
+        }
+        async function handleLockScreenRegister(e) {
+            if (e) e.preventDefault();
+            const username = document.getElementById('lock-reg-username').value.trim().toLowerCase();
+            const name = document.getElementById('lock-reg-name').value.trim();
+            const pin = document.getElementById('lock-reg-password').value.trim();
+            const weight = Number(document.getElementById('lock-reg-weight').value) || 75;
+            const height = Number(document.getElementById('lock-reg-height').value) || 178;
+
+            if (!username || !name || pin.length < 4) {
+                showLockScreenError('Rellena usuario, nombre y contraseña de mínimo 4 caracteres.');
+                return;
+            }
+            if (findUserByUsernameOrCode(username)) {
+                showLockScreenError('Ese nombre de usuario ya está ocupado.');
+                return;
+            }
+
+            const newId = 'u-' + Date.now();
+            const code = '#' + username.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() + Math.floor(10 + Math.random() * 89);
+
+            globalStore.users[newId] = createUserAccount({
+                id: newId,
+                username,
+                name,
+                pin,
+                role: 'user',
+                friendCode: code,
+                weight,
+                height
+            });
+
+            isSessionUnlocked = true;
+            const overlay = document.getElementById('lock-screen-overlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.style.display = 'none';
+            }
+            globalStore.currentUserId = newId;
+            syncActiveUserPointer();
+            renderAll();
+            showToast(`Cuenta @${username} creada 🎉`, 'emerald');
+            saveStateEverywhere();
+        }
+
+        function logoutAndLockApp() {
+            isSessionUnlocked = false;
+            localStorage.removeItem(REMEMBER_SESSION_KEY);
+            document.getElementById('lock-password-input').value = '';
+            document.getElementById('lock-error-box').classList.add('hidden');
+            const overlay = document.getElementById('lock-screen-overlay');
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                overlay.style.display = 'flex';
+            }
+            showToast('Sesión bloqueada 🔒', 'indigo');
+        }
+
+        function bufferToBase64Url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let str = '';
+            for (const charCode of bytes) str += String.fromCharCode(charCode);
+            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function base64UrlToBuffer(base64Url) {
+            const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+            const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const buffer = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) buffer[i] = rawData.charCodeAt(i);
+            return buffer.buffer;
+        }
+
+        async function registerFaceIdForCurrentAccount() {
+            if (!window.PublicKeyCredential) {
+                showToast('Face ID / Passkey no soportado en este navegador', 'amber');
+                return;
+            }
+            try {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                const userIdBuffer = new TextEncoder().encode(state.id);
+
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge,
+                        rp: { name: 'HabitPulse iOS' },
+                        user: {
+                            id: userIdBuffer,
+                            name: state.username || 'paaauf',
+                            displayName: state.profile.name || 'Usuario'
+                        },
+                        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+                        authenticatorSelection: {
+                            authenticatorAttachment: 'platform',
+                            userVerification: 'required'
+                        },
+                        timeout: 60000
+                    }
+                });
+
+                if (credential && credential.rawId) {
+                    state.faceIdCredentialId = bufferToBase64Url(credential.rawId);
+                    renderAll();
+                    await saveStateEverywhere();
+                    showToast('¡Face ID vinculado correctamente en este dispositivo! 🪪', 'emerald');
+                }
+            } catch (err) {
+                showToast('No se completó el registro de Face ID', 'amber');
+            }
+        }
+
+        async function handleLockScreenFaceId() {
+            const usernameVal = (document.getElementById('lock-username-input')?.value || '').trim();
+            const targetUser = findUserByUsernameOrCode(usernameVal) || globalStore.users['u-admin'];
+            if (!targetUser || !targetUser.faceIdCredentialId) {
+                showLockScreenError('Primero entra con tu contraseña y vincula Face ID en Ajustes.');
+                return;
+            }
+            await verifyFaceIdCredential(targetUser, true);
+        }
+
+        async function triggerFaceIdLogin() {
+            const targetUser = globalStore.users[pendingLoginTargetUserId];
+            if (!targetUser || !targetUser.faceIdCredentialId) {
+                showToast('Esta cuenta no tiene Face ID vinculado', 'amber');
+                return;
+            }
+            await verifyFaceIdCredential(targetUser, false);
+        }
+
+        async function verifyFaceIdCredential(targetUser, fromLockScreen = false) {
+            try {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+
+                const assertion = await navigator.credentials.get({
+                    publicKey: {
+                        challenge,
+                        allowCredentials: [{ id: base64UrlToBuffer(targetUser.faceIdCredentialId), type: 'public-key', transports: ['internal'] }],
+                        userVerification: 'required',
+                        timeout: 60000
+                    }
+                });
+
+                if (assertion) {
+                    isSessionUnlocked = true;
+                    const overlay = document.getElementById('lock-screen-overlay');
+                    if (overlay) {
+                        overlay.classList.add('hidden');
+                        overlay.style.display = 'none';
+                    }
+                    closeAuthModal();
+                    await completeUserSwitch(targetUser.id);
+                    showToast(`Desbloqueado con Face ID · Hola, ${targetUser.profile.name} 🪪`, 'emerald');
+                }
+            } catch (err) {
+                if (fromLockScreen) showLockScreenError('Fallo en verificación Face ID');
+                else showToast('Fallo en verificación Face ID', 'rose');
+            }
+        }
+
+        function openAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            renderAuthAccountsList();
+            switchAuthModalView('login');
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function switchAuthModalView(view) {
+            const isLogin = view === 'login';
+            document.getElementById('auth-view-login').classList.toggle('hidden', !isLogin);
+            document.getElementById('auth-view-register').classList.toggle('hidden', isLogin);
+            document.getElementById('authmodal-tab-login').className = isLogin ? 'py-2 rounded-xl bg-indigo-600 text-white shadow transition' : 'py-2 rounded-xl text-slate-500 dark:text-slate-300 transition';
+            document.getElementById('authmodal-tab-register').className = !isLogin ? 'py-2 rounded-xl bg-emerald-600 text-white shadow transition' : 'py-2 rounded-xl text-slate-500 dark:text-slate-300 transition';
+            if (isLogin) renderAuthAccountsList();
+        }
+
+        function renderAuthAccountsList() {
+            const listEl = document.getElementById('auth-accounts-list');
+            if (!listEl) return;
+            const usersList = Object.values(globalStore.users);
+            listEl.innerHTML = usersList.map(u => {
+                const isCurrent = u.id === state.id;
+                const hasFaceId = Boolean(u.faceIdCredentialId);
+                return `
+                    <button type="button" onclick="promptAccountLogin('${u.id}')"
+                        class="w-full p-3.5 rounded-2xl flex items-center justify-between border transition active:scale-95 ${
+                            isCurrent ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-100 dark:bg-white/5 border-transparent hover:border-indigo-500/40'
+                        }">
+                        <div class="flex items-center gap-3 text-left">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black flex items-center justify-center">
+                                ${(u.profile.name || u.username || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <p class="font-extrabold text-sm flex items-center gap-1.5">
+                                    <span>${escapeHTML(u.profile.name)}</span>
+                                    <span class="text-[11px] text-indigo-400 font-mono">@${escapeHTML(u.username)}</span>
+                                    ${u.role === 'admin' ? '<span>👑</span>' : ''}
+                                    ${hasFaceId ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Face ID</span>' : ''}
+                                </p>
+                                <span class="text-[11px] text-slate-400 font-mono">Código: ${u.friendCode}</span>
+                            </div>
+                        </div>
+                        <span class="text-xs font-extrabold ${isCurrent ? 'text-emerald-400' : 'text-indigo-400'}">
+                            ${isCurrent ? 'Activa ●' : '🔒 Desbloquear'}
+                        </span>
+                    </button>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function promptAccountLogin(userId) {
+            const targetUser = globalStore.users[userId];
+            if (!targetUser) return;
+            if (userId === state.id) {
+                closeAuthModal();
+                showToast(`Ya tienes iniciada tu sesión`, 'indigo');
+                return;
+            }
+            pendingLoginTargetUserId = userId;
+            const box = document.getElementById('auth-password-prompt-box');
+            box.classList.remove('hidden');
+            document.getElementById('modal-login-error-box').classList.add('hidden');
+            document.getElementById('login-selected-user-title').textContent = `Entrar en @${targetUser.username}`;
+            const passInput = document.getElementById('login-password-input');
+            passInput.value = '';
+            passInput.focus();
+
+            const faceIdBtn = document.getElementById('btn-login-faceid');
+            faceIdBtn.classList.toggle('hidden', !targetUser.faceIdCredentialId);
+        }
+
+        async function handleConfirmAccountLogin(e) {
+            e.preventDefault();
+            const targetUser = globalStore.users[pendingLoginTargetUserId];
+            if (!targetUser) return;
+
+            const enteredPass = document.getElementById('login-password-input').value;
+            const errBox = document.getElementById('modal-login-error-box');
+            const errText = document.getElementById('modal-login-error-text');
+
+            if (enteredPass !== targetUser.pin) {
+                if (errBox && errText) {
+                    errText.textContent = 'Contraseña incorrecta.';
+                    errBox.classList.remove('hidden');
+                    errBox.classList.remove('animate-shake');
+                    void errBox.offsetWidth;
+                    errBox.classList.add('animate-shake');
+                }
+                showToast('Contraseña incorrecta 🔒', 'rose');
+                return;
+            }
+            if (errBox) errBox.classList.add('hidden');
+            closeAuthModal();
+            await completeUserSwitch(targetUser.id);
+            showToast(`Sesión cambiada a ${targetUser.profile.name} 👋`, 'emerald');
+        }
+
+        async function handleRegisterNewAccount(e) {
+            e.preventDefault();
+            const username = (document.getElementById('reg-username')?.value || '').trim().toLowerCase();
+            const name = document.getElementById('reg-name').value.trim();
+            const pin = document.getElementById('reg-pin').value.trim();
+            const weight = Number(document.getElementById('reg-weight').value) || 75;
+            const height = Number(document.getElementById('reg-height').value) || 178;
+            const wantFaceId = document.getElementById('reg-enable-faceid')?.checked;
+
+            if (!username || !name || pin.length < 4) {
+                showToast('Introduce usuario, nombre y contraseña (mínimo 4 caracteres)', 'amber');
+                return;
+            }
+            if (findUserByUsernameOrCode(username)) {
+                showToast('Ese nombre de usuario ya existe', 'rose');
+                return;
+            }
+
+            const newId = 'u-' + Date.now();
+            const code = '#' + username.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase() + Math.floor(10 + Math.random() * 89);
+
+            globalStore.users[newId] = createUserAccount({
+                id: newId,
+                username,
+                name,
+                pin,
+                role: 'user',
+                friendCode: code,
+                weight,
+                height
+            });
+
+            closeAuthModal();
+            await completeUserSwitch(newId);
+            showToast(`Cuenta @${username} creada 🎉`, 'emerald');
+
+            if (wantFaceId) {
+                setTimeout(() => { registerFaceIdForCurrentAccount(); }, 350);
+            }
+        }
+
+        async function completeUserSwitch(userId) {
+            globalStore.currentUserId = userId;
+            syncActiveUserPointer();
+            renderAll();
+            await saveStateEverywhere();
+        }
+
+        async function adminSwitchDirectlyToUser(userId) {
+            if (state.role !== 'admin') return;
+            await completeUserSwitch(userId);
+            showToast('Acceso de administrador aplicado', 'indigo');
+        }
+
+        async function adminDeleteUser(userId) {
+            if (state.role !== 'admin' || userId === 'u-admin') return;
+            delete globalStore.users[userId];
+            if (globalStore.currentUserId === userId) {
+                globalStore.currentUserId = 'u-admin';
+            }
+            syncActiveUserPointer();
+            renderAll();
+            await saveStateEverywhere();
+            showToast('Cuenta eliminada', 'amber');
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        }
+
+        function openHabitModal(habitId = null) {
+            const modal = document.getElementById('habit-modal');
+            const editId = document.getElementById('habit-edit-id');
+            const nameInput = document.getElementById('habit-name-input');
+            const emojiInput = document.getElementById('habit-emoji-input');
+            const colorInput = document.getElementById('habit-color-input');
+            const delBtn = document.getElementById('btn-delete-habit');
+
+            if (habitId) {
+                const h = state.habits.find(item => item.id === habitId);
+                if (!h) return;
+                document.getElementById('modal-habit-title').textContent = 'Editar Hábito';
+                editId.value = h.id;
+                nameInput.value = h.name;
+                emojiInput.value = h.emoji;
+                colorInput.value = h.color || 'indigo';
+                if (delBtn) delBtn.classList.toggle('hidden', state.habits.length <= 1);
+            } else {
+                document.getElementById('modal-habit-title').textContent = 'Nuevo Hábito Diario';
+                editId.value = '';
+                nameInput.value = '';
+                emojiInput.value = '⚡';
+                colorInput.value = 'indigo';
+                if (delBtn) delBtn.classList.add('hidden');
+            }
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeHabitModal() {
+            const modal = document.getElementById('habit-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function handleSaveHabit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('habit-edit-id').value;
+            const name = document.getElementById('habit-name-input').value.trim();
+            const emoji = document.getElementById('habit-emoji-input').value.trim() || '⚡';
+            const color = document.getElementById('habit-color-input').value;
+
+            if (!name) return;
+
+            if (editId) {
+                const h = state.habits.find(item => item.id === editId);
+                if (h) {
+                    h.name = name;
+                    h.emoji = emoji;
+                    h.color = color;
+                }
+            } else {
+                state.habits.push({
+                    id: 'h-' + Date.now(),
+                    name,
+                    emoji,
+                    color,
+                    baseStreak: 0,
+                    days: [false, false, false, false, false, false, false]
+                });
+            }
+
+            closeHabitModal();
+            renderAll();
+            saveStateEverywhere();
+            showToast('Hábito guardado correctamente', 'emerald');
+        }
+
+        function handleDeleteHabit() {
+            const id = document.getElementById('habit-edit-id').value;
+            if (!id || state.habits.length <= 1) return;
+            state.habits = state.habits.filter(h => h.id !== id);
+            closeHabitModal();
+            renderAll();
+            saveStateEverywhere();
+            showToast('Hábito eliminado', 'amber');
+        }
+
+        Object.assign(window, {
+            switchTab,
+            selectDayInStrip,
+            toggleHabitDay,
+            changeWaterGlasses,
+            setWaterGlassLevel,
+            startGymRestTimer,
+            stopGymRestTimer,
+            openGymRoutineModal,
+            closeGymRoutineModal,
+            selectGymModalDay,
+            saveGymSessionTitle,
+            updateGymExerciseWeight,
+            handleAddGymExercise,
+            deleteGymExercise,
+            selectMealType,
+            calculateMacrosAutomatically,
+            saveMealEntry,
+            quickAddFavoriteMeal,
+            deleteFavoriteMeal,
+            deleteMealEntry,
+            switchUniSubView,
+            setPomodoroMode,
+            togglePomodoroTimer,
+            resetPomodoroTimer,
+            handleAddTask,
+            toggleTaskDone,
+            deleteTask,
+            setTaskFilter,
+            changeCalendarMonth,
+            prefillExamDate,
+            handleAddExam,
+            deleteExam,
+            switchProgressSubView,
+            copyMyFriendCode,
+            handleAddFriendByCode,
+            removeFriendByCode,
+            previewSelectedPhysiquePhoto,
+            handleAddProgressPhoto,
+            deletePhysiquePhoto,
+            renderPhysiqueComparison,
+            switchLockScreenTab,
+            togglePasswordVisibility,
+            handleLockScreenLogin,
+            handleLockScreenFaceId,
+            handleLockScreenRegister,
+            logoutAndLockApp,
+            openAuthModal,
+            closeAuthModal,
+            switchAuthModalView,
+            promptAccountLogin,
+            handleConfirmAccountLogin,
+            registerFaceIdForCurrentAccount,
+            triggerFaceIdLogin,
+            handleChangePassword,
+            adminSwitchDirectlyToUser,
+            adminDeleteUser,
+            handleRegisterNewAccount,
+            recalculateRecommendedTargets,
+            handleSaveProfile,
+            openHabitModal,
+            closeHabitModal,
+            handleSaveHabit,
+            handleDeleteHabit,
+            toggleTheme
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadFromLocalBackup();
+            const rememberedId = localStorage.getItem(REMEMBER_SESSION_KEY);
+            if (rememberedId && globalStore.users[rememberedId]) {
+                globalStore.currentUserId = rememberedId;
+                isSessionUnlocked = true;
+                document.getElementById('lock-screen-overlay').classList.add('hidden');
+            } else {
+                isSessionUnlocked = false;
+                document.getElementById('lock-screen-overlay').classList.remove('hidden');
+            }
+            switchTab('hoy');
+            renderAll();
+            initFirebaseCloud();
+        });
+    </script>
+</body>
+</html>
