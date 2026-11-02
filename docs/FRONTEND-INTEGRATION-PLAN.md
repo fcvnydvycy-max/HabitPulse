@@ -42,6 +42,9 @@ The values above are placeholders. The URL and publishable/anon key can be used 
 - `profile`: getMine, updateMine.
 - `personalData`: list/create helpers for habits, workouts, meals, tasks and body metrics.
 - `friends`: findByCode, requestByCode, list, respond.
+- `friendRequests`: inbox, sent.
+- `habitEntries`: listForHabit, setCompletion.
+- `challenges`: create, listMineAndJoined, join, addEntry, listMembers, listEntries.
 - `progressPhotos`: upload, signedUrl, remove.
 
 ## Important implementation notes
