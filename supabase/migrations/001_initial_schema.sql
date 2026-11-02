@@ -340,6 +340,25 @@ $$;
 revoke all on function public.request_friend_by_code(text) from public, anon;
 grant execute on function public.request_friend_by_code(text) to authenticated;
 
+-- Return only basic participant identity inside a challenge the caller belongs to.
+create or replace function public.list_challenge_members(p_challenge_id uuid)
+returns table (user_id uuid, username text, display_name text)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select cm.user_id, p.username, p.display_name
+  from public.challenge_members cm
+  join public.profiles p on p.id = cm.user_id
+  where cm.challenge_id = p_challenge_id
+    and public.is_current_user_challenge_member(p_challenge_id)
+  order by p.display_name;
+$;
+
+revoke all on function public.list_challenge_members(uuid) from public, anon;
+grant execute on function public.list_challenge_members(uuid) to authenticated;
+
 -- Add the challenge creator as the first participant automatically.
 create or replace function public.add_challenge_creator_as_member()
 returns trigger
@@ -532,9 +551,7 @@ using (created_by = (select auth.uid()))
 with check (created_by = (select auth.uid()));
 create policy "challenge_members_member_select" on public.challenge_members
 for select to authenticated
-using (
-  user_id = (select auth.uid()) or public.is_current_user_challenge_creator(challenge_id)
-);
+using (public.is_current_user_challenge_member(challenge_id));
 create policy "challenge_members_self_join" on public.challenge_members
 for insert to authenticated
 with check (
