@@ -506,9 +506,9 @@ for each row execute function public.prevent_profile_identity_changes();
 create policy "friend_requests_participant_select" on public.friend_requests
 for select to authenticated
 using (sender_id = (select auth.uid()) or recipient_id = (select auth.uid()));
-create policy "friend_requests_sender_insert" on public.friend_requests
-for insert to authenticated
-with check (sender_id = (select auth.uid()) and status = 'pending');
+-- Friend requests can only be created through request_friend_by_code().
+drop policy if exists "friend_requests_sender_insert" on public.friend_requests;
+revoke insert on public.friend_requests from authenticated;
 -- Responses are handled by respond_to_friend_request(); direct client updates are intentionally disabled.
 
 -- Friendships are readable only by either participant. Creation is handled
