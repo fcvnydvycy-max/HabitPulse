@@ -61,3 +61,12 @@ Do not connect the production app or invite real friends until:
 4. Registration, email confirmation, sign-in, sign-out and password reset have been tested.
 5. Existing browser-local data has an export and restore path before any migration or storage reset.
 6. The user has explicitly approved any change that affects the published app.
+
+
+## Additional hardening included in the migration
+
+- Profile rows are owner-only. Friend-facing profile data is returned through narrow RPCs.
+- A database trigger prevents a client from changing the profile UUID or generated friend code.
+- Friend requests can only be created through `request_friend_by_code()`; direct client INSERT permission and the direct-insert policy are removed.
+- Challenge and friendship helper functions bind checks to the authenticated caller rather than accepting an arbitrary claimed user ID.
+
