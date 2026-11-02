@@ -141,6 +141,128 @@ export const personalData = {
   createBodyMetric: values => insertOwned('body_metrics', values)
 };
 
+export const habitEntries = {
+  async listForHabit(habitId) {
+    await requireUser();
+    const { data, error } = await supabase
+      .from('habit_entries')
+      .select('*')
+      .eq('habit_id', habitId)
+      .order('entry_date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async setCompletion({ habitId, entryDate, completed, note = null }) {
+    const user = await requireUser();
+    const { data, error } = await supabase
+      .from('habit_entries')
+      .upsert({
+        habit_id: habitId,
+        user_id: user.id,
+        entry_date: entryDate,
+        completed: Boolean(completed),
+        note
+      }, { onConflict: 'habit_id,entry_date' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+};
+
+export const challenges = {
+  async create({ title, description, startsOn, endsOn, metric = 'habit_completions', targetValue = null }) {
+    const user = await requireUser();
+    const { data, error } = await supabase
+      .from('challenges')
+      .insert({
+        created_by: user.id,
+        title,
+        description: description || null,
+        starts_on: startsOn,
+        ends_on: endsOn,
+        metric,
+        target_value: targetValue
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async listMineAndJoined() {
+    await requireUser();
+    const { data, error } = await supabase
+      .from('challenges')
+      .select('*, challenge_members(user_id, joined_at)')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async join(challengeId) {
+    const user = await requireUser();
+    const { error } = await supabase
+      .from('challenge_members')
+      .insert({ challenge_id: challengeId, user_id: user.id });
+    if (error) throw error;
+  },
+
+  async addEntry({ challengeId, entryDate, value = 1, note = null }) {
+    const user = await requireUser();
+    const { data, error } = await supabase
+      .from('challenge_entries')
+      .insert({
+        challenge_id: challengeId,
+        user_id: user.id,
+        entry_date: entryDate || new Date().toISOString().slice(0, 10),
+        value,
+        note
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async listEntries(challengeId) {
+    await requireUser();
+    const { data, error } = await supabase
+      .from('challenge_entries')
+      .select('*')
+      .eq('challenge_id', challengeId)
+      .order('entry_date', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+};
+
+export const friendRequests = {
+  async inbox() {
+    await requireUser();
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .select('id, sender_id, recipient_id, status, created_at')
+      .eq('recipient_id', (await requireUser()).id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async sent() {
+    const user = await requireUser();
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .select('id, sender_id, recipient_id, status, created_at')
+      .eq('sender_id', user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+};
+
 export const friends = {
   async findByCode(friendCode) {
     await requireUser();
