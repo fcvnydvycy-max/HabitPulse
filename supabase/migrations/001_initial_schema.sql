@@ -193,6 +193,71 @@ alter table public.challenges enable row level security;
 alter table public.challenge_members enable row level security;
 alter table public.challenge_entries enable row level security;
 
+-- Narrow SECURITY DEFINER helpers prevent recursive RLS checks between challenge tables.
+create or replace function public.is_challenge_member(p_challenge_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = public, pg_temp
+as $ select exists (
+  select 1 from public.challenge_members
+  where challenge_id = p_challenge_id and user_id = p_user_id
+); $;
+
+create or replace function public.is_challenge_creator(p_challenge_id uuid, p_user_id uuid)
+returns boolean language sql stable security definer set search_path = public, pg_temp
+as $ select exists (
+  select 1 from public.challenges
+  where id = p_challenge_id and created_by = p_user_id
+); $;
+
+create or replace function public.are_habitpulse_friends(p_user_a uuid, p_user_b uuid)
+returns boolean language sql stable security definer set search_path = public, pg_temp
+as $ select exists (
+  select 1 from public.friendships
+  where user_low = least(p_user_a, p_user_b)
+    and user_high = greatest(p_user_a, p_user_b)
+); $;
+
+revoke all on function public.is_challenge_member(uuid, uuid) from public, anon;
+revoke all on function public.is_challenge_creator(uuid, uuid) from public, anon;
+revoke all on function public.are_habitpulse_friends(uuid, uuid) from public, anon;
+grant execute on function public.is_challenge_member(uuid, uuid) to authenticated;
+grant execute on function public.is_challenge_creator(uuid, uuid) to authenticated;
+grant execute on function public.are_habitpulse_friends(uuid, uuid) to authenticated;
+
+-- Accept/reject requests through a trusted function so clients cannot rewrite sender/recipient IDs.
+create or replace function public.respond_to_friend_request(p_request_id uuid, p_response text)
+returns void language plpgsql security definer set search_path = public, pg_temp
+as $
+declare
+  v_sender uuid;
+  v_recipient uuid;
+begin
+  if p_response not in ('accepted', 'rejected') then
+    raise exception 'Invalid response';
+  end if;
+
+  select sender_id, recipient_id into v_sender, v_recipient
+  from public.friend_requests
+  where id = p_request_id and status = 'pending'
+  for update;
+
+  if not found or v_recipient <> auth.uid() then
+    raise exception 'Friend request not found or not permitted';
+  end if;
+
+  update public.friend_requests
+  set status = p_response, updated_at = now()
+  where id = p_request_id;
+
+  if p_response = 'accepted' then
+    insert into public.friendships(user_low, user_high)
+    values (least(v_sender, v_recipient), greatest(v_sender, v_recipient))
+    on conflict do nothing;
+  end if;
+end;
+$;
+revoke all on function public.respond_to_friend_request(uuid, text) from public, anon;
+grant execute on function public.respond_to_friend_request(uuid, text) to authenticated;
+
 -- Profiles: users can manage their own profile. Other users can only see
 -- a minimal profile when a friendship exists.
 create policy "profiles_select_self_or_friend" on public.profiles
@@ -259,10 +324,7 @@ using (sender_id = (select auth.uid()) or recipient_id = (select auth.uid()));
 create policy "friend_requests_sender_insert" on public.friend_requests
 for insert to authenticated
 with check (sender_id = (select auth.uid()) and status = 'pending');
-create policy "friend_requests_recipient_update" on public.friend_requests
-for update to authenticated
-using (recipient_id = (select auth.uid()) and status = 'pending')
-with check (recipient_id = (select auth.uid()) and status in ('accepted', 'rejected'));
+-- Responses are handled by respond_to_friend_request(); direct client updates are intentionally disabled.
 
 -- Friendships are readable only by either participant. Creation is handled
 -- by the trusted acceptance workflow, not by arbitrary client inserts.
@@ -274,10 +336,7 @@ using (user_low = (select auth.uid()) or user_high = (select auth.uid()));
 create policy "challenges_member_select" on public.challenges
 for select to authenticated
 using (
-  created_by = (select auth.uid()) or exists (
-    select 1 from public.challenge_members cm
-    where cm.challenge_id = id and cm.user_id = (select auth.uid())
-  )
+  created_by = (select auth.uid()) or public.is_challenge_member(id, (select auth.uid()))
 );
 create policy "challenges_creator_insert" on public.challenges
 for insert to authenticated
@@ -289,30 +348,25 @@ with check (created_by = (select auth.uid()));
 create policy "challenge_members_member_select" on public.challenge_members
 for select to authenticated
 using (
-  user_id = (select auth.uid()) or exists (
-    select 1 from public.challenges c
-    where c.id = challenge_id and c.created_by = (select auth.uid())
-  )
+  user_id = (select auth.uid()) or public.is_challenge_creator(challenge_id, (select auth.uid()))
 );
 create policy "challenge_members_self_join" on public.challenge_members
 for insert to authenticated
 with check (
-  user_id = (select auth.uid()) and exists (
-    select 1 from public.challenges c where c.id = challenge_id
+  user_id = (select auth.uid()) and (
+    public.is_challenge_creator(challenge_id, (select auth.uid())) or exists (
+      select 1 from public.challenges c
+      where c.id = challenge_id
+        and public.are_habitpulse_friends(c.created_by, (select auth.uid()))
+    )
   )
 );
 create policy "challenge_entries_member_select" on public.challenge_entries
 for select to authenticated
-using (exists (
-  select 1 from public.challenge_members cm
-  where cm.challenge_id = challenge_id and cm.user_id = (select auth.uid())
-));
+using (public.is_challenge_member(challenge_id, (select auth.uid())));
 create policy "challenge_entries_self_insert" on public.challenge_entries
 for insert to authenticated
-with check (user_id = (select auth.uid()) and exists (
-  select 1 from public.challenge_members cm
-  where cm.challenge_id = challenge_id and cm.user_id = (select auth.uid())
-));
+with check (user_id = (select auth.uid()) and public.is_challenge_member(challenge_id, (select auth.uid())));
 create policy "challenge_entries_owner_update_delete" on public.challenge_entries
 for update to authenticated
 using (user_id = (select auth.uid()))
