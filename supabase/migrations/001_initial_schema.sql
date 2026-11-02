@@ -434,9 +434,9 @@ grant execute on function public.respond_to_friend_request(uuid, text) to authen
 create policy "profiles_select_self" on public.profiles
 for select to authenticated
 using (id = (select auth.uid()));
-create policy "profiles_insert_self" on public.profiles
-for insert to authenticated
-with check (id = (select auth.uid()));
+-- Profiles are created only by the Auth trigger, never by browser INSERT.
+drop policy if exists "profiles_insert_self" on public.profiles;
+revoke insert on public.profiles from authenticated;
 create policy "profiles_update_self" on public.profiles
 for update to authenticated
 using (id = (select auth.uid()))
