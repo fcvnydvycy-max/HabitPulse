@@ -193,6 +193,82 @@ alter table public.challenges enable row level security;
 alter table public.challenge_members enable row level security;
 alter table public.challenge_entries enable row level security;
 
+
+-- Create a minimal profile automatically when Supabase Auth creates an account.
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_display_name text;
+  v_username text;
+begin
+  v_display_name := coalesce(
+    nullif(left(trim(new.raw_user_meta_data ->> 'display_name'), 40), ''),
+    'HabitPulse user'
+  );
+  v_username := nullif(lower(regexp_replace(coalesce(new.raw_user_meta_data ->> 'username', ''), '[^a-zA-Z0-9_]', '', 'g')), '');
+  if v_username is not null then
+    v_username := left(v_username, 24);
+    if char_length(v_username) < 3 then v_username := null; end if;
+  end if;
+
+  insert into public.profiles (id, username, display_name)
+  values (new.id, v_username, v_display_name)
+  on conflict (id) do nothing;
+  return new;
+end;
+$;
+
+drop trigger if exists on_auth_user_created_habitpulse on auth.users;
+create trigger on_auth_user_created_habitpulse
+after insert on auth.users
+for each row execute function public.handle_new_auth_user();
+
+-- Look up an exact friend code and return only the small public profile fields.
+-- This does not expose email, habits, workouts, nutrition, measurements or photos.
+create or replace function public.find_profile_by_friend_code(p_friend_code text)
+returns table (user_id uuid, username text, display_name text, friend_code text)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select p.id, p.username, p.display_name, p.friend_code
+  from public.profiles p
+  where auth.uid() is not null
+    and p.friend_code = upper(trim(p_friend_code))
+    and p.id <> auth.uid()
+  limit 1;
+$;
+
+revoke all on function public.handle_new_auth_user() from public, anon, authenticated;
+revoke all on function public.find_profile_by_friend_code(text) from public, anon;
+grant execute on function public.find_profile_by_friend_code(text) to authenticated;
+
+-- Add the challenge creator as the first participant automatically.
+create or replace function public.add_challenge_creator_as_member()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+begin
+  insert into public.challenge_members (challenge_id, user_id)
+  values (new.id, new.created_by)
+  on conflict do nothing;
+  return new;
+end;
+$;
+
+revoke all on function public.add_challenge_creator_as_member() from public, anon, authenticated;
+drop trigger if exists on_habitpulse_challenge_created on public.challenges;
+create trigger on_habitpulse_challenge_created
+after insert on public.challenges
+for each row execute function public.add_challenge_creator_as_member();
+
 -- Narrow SECURITY DEFINER helpers prevent recursive RLS checks between challenge tables.
 create or replace function public.is_challenge_member(p_challenge_id uuid, p_user_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
