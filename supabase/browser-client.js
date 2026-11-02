@@ -226,6 +226,15 @@ export const challenges = {
     return data;
   },
 
+  async listMembers(challengeId) {
+    await requireUser();
+    const { data, error } = await supabase.rpc('list_challenge_members', {
+      p_challenge_id: challengeId
+    });
+    if (error) throw error;
+    return data || [];
+  },
+
   async listEntries(challengeId) {
     await requireUser();
     const { data, error } = await supabase
