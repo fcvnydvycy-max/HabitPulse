@@ -215,9 +215,16 @@ begin
     if char_length(v_username) < 3 then v_username := null; end if;
   end if;
 
-  insert into public.profiles (id, username, display_name)
-  values (new.id, v_username, v_display_name)
-  on conflict (id) do nothing;
+  begin
+    insert into public.profiles (id, username, display_name)
+    values (new.id, v_username, v_display_name)
+    on conflict (id) do nothing;
+  exception when unique_violation then
+    -- A username collision must never prevent account registration.
+    insert into public.profiles (id, username, display_name)
+    values (new.id, null, v_display_name)
+    on conflict (id) do nothing;
+  end;
   return new;
 end;
 $;
@@ -247,6 +254,67 @@ $;
 revoke all on function public.handle_new_auth_user() from public, anon, authenticated;
 revoke all on function public.find_profile_by_friend_code(text) from public, anon;
 grant execute on function public.find_profile_by_friend_code(text) to authenticated;
+
+
+-- Send a friend request using a friend code, without exposing arbitrary user IDs.
+-- Reversed pending requests are accepted as mutual intent.
+create or replace function public.request_friend_by_code(p_friend_code text)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+  v_target uuid;
+  v_existing_status text;
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  select p.id into v_target
+  from public.profiles p
+  where p.friend_code = upper(trim(p_friend_code))
+    and p.id <> auth.uid()
+  limit 1;
+
+  if v_target is null then
+    raise exception 'Friend code not found';
+  end if;
+
+  if public.are_habitpulse_friends(auth.uid(), v_target) then
+    return 'already_friends';
+  end if;
+
+  select fr.status into v_existing_status
+  from public.friend_requests fr
+  where fr.sender_id = v_target
+    and fr.recipient_id = auth.uid()
+    and fr.status = 'pending'
+  limit 1;
+
+  if v_existing_status = 'pending' then
+    perform public.respond_to_friend_request(
+      (select fr.id from public.friend_requests fr
+       where fr.sender_id = v_target and fr.recipient_id = auth.uid()
+         and fr.status = 'pending' limit 1),
+      'accepted'
+    );
+    return 'accepted_existing_request';
+  end if;
+
+  insert into public.friend_requests(sender_id, recipient_id, status)
+  values (auth.uid(), v_target, 'pending')
+  on conflict (sender_id, recipient_id) do update
+    set status = 'pending', updated_at = now()
+    where public.friend_requests.status in ('rejected', 'cancelled');
+
+  return 'request_sent';
+end;
+$;
+
+revoke all on function public.request_friend_by_code(text) from public, anon;
+grant execute on function public.request_friend_by_code(text) to authenticated;
 
 -- Add the challenge creator as the first participant automatically.
 create or replace function public.add_challenge_creator_as_member()
