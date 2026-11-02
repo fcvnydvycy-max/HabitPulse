@@ -200,7 +200,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 declare
   v_display_name text;
   v_username text;
@@ -242,7 +242,7 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$
+as $
   select p.id, p.username, p.display_name
   from public.profiles p
   where auth.uid() is not null
@@ -264,7 +264,7 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $$
+as $
   select p.id, p.username, p.display_name
   from public.friendships f
   join public.profiles p
@@ -287,7 +287,7 @@ returns text
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 declare
   v_target uuid;
   v_existing_status text;
@@ -346,7 +346,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $
 begin
   insert into public.challenge_members (challenge_id, user_id)
   values (new.id, new.created_by)
@@ -365,21 +365,21 @@ for each row execute function public.add_challenge_creator_as_member();
 -- the checked user to auth.uid(), preventing arbitrary relationship probing.
 create or replace function public.is_current_user_challenge_member(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$$ select auth.uid() is not null and exists (
+as $ select auth.uid() is not null and exists (
   select 1 from public.challenge_members
   where challenge_id = p_challenge_id and user_id = auth.uid()
 ); $$;
 
 create or replace function public.is_current_user_challenge_creator(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$$ select auth.uid() is not null and exists (
+as $ select auth.uid() is not null and exists (
   select 1 from public.challenges
   where id = p_challenge_id and created_by = auth.uid()
 ); $$;
 
 create or replace function public.is_friend_of_current_user(p_other_user_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$$ select auth.uid() is not null and exists (
+as $ select auth.uid() is not null and exists (
   select 1 from public.friendships
   where user_low = least(auth.uid(), p_other_user_id)
     and user_high = greatest(auth.uid(), p_other_user_id)
@@ -415,7 +415,7 @@ grant execute on function public.list_challenge_members(uuid) to authenticated;
 -- Accept/reject requests through a trusted function so clients cannot rewrite sender/recipient IDs.
 create or replace function public.respond_to_friend_request(p_request_id uuid, p_response text)
 returns void language plpgsql security definer set search_path = public, pg_temp
-as $$
+as $
 declare
   v_sender uuid;
   v_recipient uuid;
@@ -507,7 +507,7 @@ create or replace function public.prevent_profile_identity_changes()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
-as $$
+as $
 begin
   if new.id <> old.id or new.friend_code <> old.friend_code then
     raise exception 'Profile identity fields cannot be changed';
