@@ -306,7 +306,7 @@ begin
     raise exception 'Friend code not found';
   end if;
 
-  if public.are_habitpulse_friends(auth.uid(), v_target) then
+  if public.is_friend_of_current_user(v_target) then
     return 'already_friends';
   end if;
 
@@ -361,35 +361,36 @@ create trigger on_habitpulse_challenge_created
 after insert on public.challenges
 for each row execute function public.add_challenge_creator_as_member();
 
--- Narrow SECURITY DEFINER helpers prevent recursive RLS checks between challenge tables.
-create or replace function public.is_challenge_member(p_challenge_id uuid, p_user_id uuid)
+-- SECURITY DEFINER helpers avoid recursive RLS checks while always binding
+-- the checked user to auth.uid(), preventing arbitrary relationship probing.
+create or replace function public.is_current_user_challenge_member(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $ select exists (
+as $$ select auth.uid() is not null and exists (
   select 1 from public.challenge_members
-  where challenge_id = p_challenge_id and user_id = p_user_id
-); $;
+  where challenge_id = p_challenge_id and user_id = auth.uid()
+); $$;
 
-create or replace function public.is_challenge_creator(p_challenge_id uuid, p_user_id uuid)
+create or replace function public.is_current_user_challenge_creator(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $ select exists (
+as $$ select auth.uid() is not null and exists (
   select 1 from public.challenges
-  where id = p_challenge_id and created_by = p_user_id
-); $;
+  where id = p_challenge_id and created_by = auth.uid()
+); $$;
 
-create or replace function public.are_habitpulse_friends(p_user_a uuid, p_user_b uuid)
+create or replace function public.is_friend_of_current_user(p_other_user_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $ select exists (
+as $$ select auth.uid() is not null and exists (
   select 1 from public.friendships
-  where user_low = least(p_user_a, p_user_b)
-    and user_high = greatest(p_user_a, p_user_b)
-); $;
+  where user_low = least(auth.uid(), p_other_user_id)
+    and user_high = greatest(auth.uid(), p_other_user_id)
+); $$;
 
-revoke all on function public.is_challenge_member(uuid, uuid) from public, anon;
-revoke all on function public.is_challenge_creator(uuid, uuid) from public, anon;
-revoke all on function public.are_habitpulse_friends(uuid, uuid) from public, anon;
-grant execute on function public.is_challenge_member(uuid, uuid) to authenticated;
-grant execute on function public.is_challenge_creator(uuid, uuid) to authenticated;
-grant execute on function public.are_habitpulse_friends(uuid, uuid) to authenticated;
+revoke all on function public.is_current_user_challenge_member(uuid) from public, anon;
+revoke all on function public.is_current_user_challenge_creator(uuid) from public, anon;
+revoke all on function public.is_friend_of_current_user(uuid) from public, anon;
+grant execute on function public.is_current_user_challenge_member(uuid) to authenticated;
+grant execute on function public.is_current_user_challenge_creator(uuid) to authenticated;
+grant execute on function public.is_friend_of_current_user(uuid) to authenticated;
 
 -- Accept/reject requests through a trusted function so clients cannot rewrite sender/recipient IDs.
 create or replace function public.respond_to_friend_request(p_request_id uuid, p_response text)
@@ -500,7 +501,7 @@ using (user_low = (select auth.uid()) or user_high = (select auth.uid()));
 create policy "challenges_member_select" on public.challenges
 for select to authenticated
 using (
-  created_by = (select auth.uid()) or public.is_challenge_member(id, (select auth.uid()))
+  created_by = (select auth.uid()) or public.is_current_user_challenge_member(id)
 );
 create policy "challenges_creator_insert" on public.challenges
 for insert to authenticated
@@ -512,25 +513,25 @@ with check (created_by = (select auth.uid()));
 create policy "challenge_members_member_select" on public.challenge_members
 for select to authenticated
 using (
-  user_id = (select auth.uid()) or public.is_challenge_creator(challenge_id, (select auth.uid()))
+  user_id = (select auth.uid()) or public.is_current_user_challenge_creator(challenge_id)
 );
 create policy "challenge_members_self_join" on public.challenge_members
 for insert to authenticated
 with check (
   user_id = (select auth.uid()) and (
-    public.is_challenge_creator(challenge_id, (select auth.uid())) or exists (
+    public.is_current_user_challenge_creator(challenge_id) or exists (
       select 1 from public.challenges c
       where c.id = challenge_id
-        and public.are_habitpulse_friends(c.created_by, (select auth.uid()))
+        and public.is_friend_of_current_user(c.created_by)
     )
   )
 );
 create policy "challenge_entries_member_select" on public.challenge_entries
 for select to authenticated
-using (public.is_challenge_member(challenge_id, (select auth.uid())));
+using (public.is_current_user_challenge_member(challenge_id));
 create policy "challenge_entries_self_insert" on public.challenge_entries
 for insert to authenticated
-with check (user_id = (select auth.uid()) and public.is_challenge_member(challenge_id, (select auth.uid())));
+with check (user_id = (select auth.uid()) and public.is_current_user_challenge_member(challenge_id));
 create policy "challenge_entries_owner_update_delete" on public.challenge_entries
 for update to authenticated
 using (user_id = (select auth.uid()))
