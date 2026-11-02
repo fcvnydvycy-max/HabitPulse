@@ -560,6 +560,28 @@ create policy "challenge_entries_owner_delete" on public.challenge_entries
 for delete to authenticated
 using (user_id = (select auth.uid()));
 
+-- Explicit API privileges. RLS remains the row-level boundary for authenticated users.
+revoke all on public.profiles, public.habits, public.habit_entries,
+  public.workouts, public.meals, public.tasks, public.body_metrics,
+  public.progress_photos, public.friend_requests, public.friendships,
+  public.challenges, public.challenge_members, public.challenge_entries
+from anon, authenticated;
+
+grant select on public.profiles to authenticated;
+grant update (username, display_name, avatar_path, updated_at) on public.profiles to authenticated;
+grant select, insert, update, delete on public.habits to authenticated;
+grant select, insert, update, delete on public.habit_entries to authenticated;
+grant select, insert, update, delete on public.workouts to authenticated;
+grant select, insert, update, delete on public.meals to authenticated;
+grant select, insert, update, delete on public.tasks to authenticated;
+grant select, insert, update, delete on public.body_metrics to authenticated;
+grant select, insert, update, delete on public.progress_photos to authenticated;
+grant select on public.friend_requests to authenticated;
+grant select on public.friendships to authenticated;
+grant select, insert, update on public.challenges to authenticated;
+grant select, insert on public.challenge_members to authenticated;
+grant select, insert, update, delete on public.challenge_entries to authenticated;
+
 -- Private bucket for progress photos. No public read access.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
