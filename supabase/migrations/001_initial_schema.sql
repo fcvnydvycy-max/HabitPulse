@@ -200,7 +200,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_display_name text;
   v_username text;
@@ -227,7 +227,7 @@ begin
   end;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists on_auth_user_created_habitpulse on auth.users;
 create trigger on_auth_user_created_habitpulse
@@ -242,14 +242,14 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
   select p.id, p.username, p.display_name
   from public.profiles p
   where auth.uid() is not null
     and p.friend_code = upper(trim(p_friend_code))
     and p.id <> auth.uid()
   limit 1;
-$;
+$$;
 
 revoke all on function public.handle_new_auth_user() from public, anon, authenticated;
 revoke all on function public.find_profile_by_friend_code(text) from public, anon;
@@ -264,7 +264,7 @@ language sql
 stable
 security definer
 set search_path = public, pg_temp
-as $
+as $$
   select p.id, p.username, p.display_name
   from public.friendships f
   join public.profiles p
@@ -275,7 +275,7 @@ as $
   where auth.uid() is not null
     and (f.user_low = auth.uid() or f.user_high = auth.uid())
   order by p.display_name;
-$;
+$$;
 
 revoke all on function public.list_my_friends() from public, anon;
 grant execute on function public.list_my_friends() to authenticated;
@@ -287,7 +287,7 @@ returns text
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 declare
   v_target uuid;
   v_existing_status text;
@@ -335,7 +335,7 @@ begin
 
   return 'request_sent';
 end;
-$;
+$$;
 
 revoke all on function public.request_friend_by_code(text) from public, anon;
 grant execute on function public.request_friend_by_code(text) to authenticated;
@@ -346,14 +346,14 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $$
 begin
   insert into public.challenge_members (challenge_id, user_id)
   values (new.id, new.created_by)
   on conflict do nothing;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.add_challenge_creator_as_member() from public, anon, authenticated;
 drop trigger if exists on_habitpulse_challenge_created on public.challenges;
@@ -365,21 +365,21 @@ for each row execute function public.add_challenge_creator_as_member();
 -- the checked user to auth.uid(), preventing arbitrary relationship probing.
 create or replace function public.is_current_user_challenge_member(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$ select auth.uid() is not null and exists (
+as $$$ select auth.uid() is not null and exists (
   select 1 from public.challenge_members
   where challenge_id = p_challenge_id and user_id = auth.uid()
 ); $$;
 
 create or replace function public.is_current_user_challenge_creator(p_challenge_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$ select auth.uid() is not null and exists (
+as $$$ select auth.uid() is not null and exists (
   select 1 from public.challenges
   where id = p_challenge_id and created_by = auth.uid()
 ); $$;
 
 create or replace function public.is_friend_of_current_user(p_other_user_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp
-as $$ select auth.uid() is not null and exists (
+as $$$ select auth.uid() is not null and exists (
   select 1 from public.friendships
   where user_low = least(auth.uid(), p_other_user_id)
     and user_high = greatest(auth.uid(), p_other_user_id)
@@ -395,7 +395,7 @@ grant execute on function public.is_friend_of_current_user(uuid) to authenticate
 -- Accept/reject requests through a trusted function so clients cannot rewrite sender/recipient IDs.
 create or replace function public.respond_to_friend_request(p_request_id uuid, p_response text)
 returns void language plpgsql security definer set search_path = public, pg_temp
-as $
+as $$
 declare
   v_sender uuid;
   v_recipient uuid;
@@ -423,7 +423,7 @@ begin
     on conflict do nothing;
   end if;
 end;
-$;
+$$;
 revoke all on function public.respond_to_friend_request(uuid, text) from public, anon;
 grant execute on function public.respond_to_friend_request(uuid, text) to authenticated;
 
@@ -487,14 +487,14 @@ create or replace function public.prevent_profile_identity_changes()
 returns trigger
 language plpgsql
 set search_path = public, pg_temp
-as $
+as $$
 begin
   if new.id <> old.id or new.friend_code <> old.friend_code then
     raise exception 'Profile identity fields cannot be changed';
   end if;
   return new;
 end;
-$;
+$$;
 
 revoke all on function public.prevent_profile_identity_changes() from public, anon, authenticated;
 drop trigger if exists protect_habitpulse_profile_identity on public.profiles;
