@@ -10,6 +10,8 @@ Working branch: `habitpulse/auth-data-foundation`
 - Private Storage bucket configuration for progress photos (5 MiB per object; JPEG, PNG, WebP and HEIC).
 - Auth-user trigger to create a minimal profile.
 - Friend-code lookup, friend-request and friend-acceptance RPCs.
+- Challenge participant listing RPC limited to authenticated challenge members.
+- Explicit least-privilege table grants; profile updates are limited to editable display fields.
 - Challenge creator membership trigger and caller-bound authorization helper functions.
 - Profile identity protection and restriction of profile creation to the Auth trigger.
 - Security test plan, Auth setup checklist and local-data preservation plan.
@@ -22,7 +24,8 @@ The app's current Firebase code is conditional on injected Firebase configuratio
 
 ## Important limitations and unverified items
 
-- The SQL has been reviewed and corrected for a function-body delimiter issue, but it has **not** been parsed or executed against a PostgreSQL/Supabase test database.
+- Static checks confirm balanced SQL function delimiters, RLS enabled on all 13 application tables, explicit grants, and a private photo bucket. This is not a PostgreSQL syntax test.
+- The SQL has **not** been parsed or executed against a PostgreSQL/Supabase test database.
 - RLS policies and RPC behavior have **not** been tested with separate authenticated users.
 - The migration is a first backend foundation, not yet a production-ready complete application.
 - The friend system currently provides profile discovery and friend relationships, but no leaderboard sharing of private habit details.
