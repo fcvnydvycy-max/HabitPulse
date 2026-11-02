@@ -237,13 +237,13 @@ for each row execute function public.handle_new_auth_user();
 -- Look up an exact friend code and return only the small public profile fields.
 -- This does not expose email, habits, workouts, nutrition, measurements or photos.
 create or replace function public.find_profile_by_friend_code(p_friend_code text)
-returns table (user_id uuid, username text, display_name text, friend_code text)
+returns table (user_id uuid, username text, display_name text)
 language sql
 stable
 security definer
 set search_path = public, pg_temp
 as $
-  select p.id, p.username, p.display_name, p.friend_code
+  select p.id, p.username, p.display_name
   from public.profiles p
   where auth.uid() is not null
     and p.friend_code = upper(trim(p_friend_code))
@@ -255,6 +255,30 @@ revoke all on function public.handle_new_auth_user() from public, anon, authenti
 revoke all on function public.find_profile_by_friend_code(text) from public, anon;
 grant execute on function public.find_profile_by_friend_code(text) to authenticated;
 
+
+
+-- List only basic profile fields for accepted friends.
+create or replace function public.list_my_friends()
+returns table (user_id uuid, username text, display_name text)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $
+  select p.id, p.username, p.display_name
+  from public.friendships f
+  join public.profiles p
+    on p.id = case
+      when f.user_low = auth.uid() then f.user_high
+      else f.user_low
+    end
+  where auth.uid() is not null
+    and (f.user_low = auth.uid() or f.user_high = auth.uid())
+  order by p.display_name;
+$;
+
+revoke all on function public.list_my_friends() from public, anon;
+grant execute on function public.list_my_friends() to authenticated;
 
 -- Send a friend request using a friend code, without exposing arbitrary user IDs.
 -- Reversed pending requests are accepted as mutual intent.
@@ -404,15 +428,11 @@ grant execute on function public.respond_to_friend_request(uuid, text) to authen
 
 -- Profiles: users can manage their own profile. Other users can only see
 -- a minimal profile when a friendship exists.
-create policy "profiles_select_self_or_friend" on public.profiles
+-- Profile rows are owner-only. Friend-facing data is exposed only through
+-- narrow RPCs below, because RLS alone cannot hide selected columns.
+create policy "profiles_select_self" on public.profiles
 for select to authenticated
-using (
-  id = (select auth.uid()) or exists (
-    select 1 from public.friendships f
-    where (f.user_low = (select auth.uid()) and f.user_high = id)
-       or (f.user_high = (select auth.uid()) and f.user_low = id)
-  )
-);
+using (id = (select auth.uid()));
 create policy "profiles_insert_self" on public.profiles
 for insert to authenticated
 with check (id = (select auth.uid()));
