@@ -240,11 +240,11 @@ export const challenges = {
 
 export const friendRequests = {
   async inbox() {
-    await requireUser();
+    const user = await requireUser();
     const { data, error } = await supabase
       .from('friend_requests')
       .select('id, sender_id, recipient_id, status, created_at')
-      .eq('recipient_id', (await requireUser()).id)
+      .eq('recipient_id', user.id)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
