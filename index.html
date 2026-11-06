@@ -2462,7 +2462,8 @@
                 document.body.appendChild(link);
                 link.click();
                 link.remove();
-                URL.revokeObjectURL(url);
+                // Keep the temporary URL alive briefly so the browser can start the download.
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000);
                 showToast('Copia de seguridad descargada ✅', 'emerald');
             } catch (error) {
                 console.error('HabitPulse backup export failed:', error);
