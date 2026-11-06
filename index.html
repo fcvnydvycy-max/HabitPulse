@@ -793,6 +793,26 @@
                 </div>
             </div>
 
+            <div class="ios-card rounded-3xl p-5 border border-slate-200/70 dark:border-white/10 space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center shrink-0">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-extrabold">Copia de seguridad de tus datos</h4>
+                        <p class="text-xs text-slate-400">Exporta los registros locales antes de conectar la cuenta en la nube</p>
+                    </div>
+                </div>
+                <p class="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    Descarga un archivo JSON con los perfiles y sus datos de HabitPulse, incluidos hábitos, entrenamientos, comidas, tareas, calendario, pesos y fotos guardadas. Por seguridad, no incluye PIN, contraseñas ni credenciales de Face ID.
+                </p>
+                <button type="button" onclick="exportHabitPulseBackup()" class="w-full py-3 rounded-2xl text-xs font-extrabold bg-cyan-600 hover:bg-cyan-500 text-white shadow active:scale-95 transition flex items-center justify-center gap-2">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Descargar copia de seguridad
+                </button>
+                <p class="text-[10px] text-amber-500 font-semibold">Guarda el archivo en un lugar privado. Puede contener información personal y fotos de progreso.</p>
+            </div>
+
             <!-- PANEL DE ADMINISTRADOR -->
             <div id="admin-panel-container" class="hidden ios-card rounded-3xl p-5 border border-amber-500/40 space-y-4 bg-gradient-to-br from-amber-500/5 to-orange-500/5">
                 <div class="flex items-center justify-between pb-3 border-b border-amber-500/30">
@@ -2408,6 +2428,46 @@
             renderAll();
             saveStateEverywhere();
             showToast('Perfil actualizado correctamente ✨', 'emerald');
+        }
+
+        function exportHabitPulseBackup() {
+            try {
+                if (!globalStore || !globalStore.users || !Object.keys(globalStore.users).length) {
+                    showToast('No hay datos locales para exportar.', 'amber');
+                    return;
+                }
+
+                // Export a copy and remove legacy authentication material.
+                const safeStore = JSON.parse(JSON.stringify(globalStore));
+                Object.values(safeStore.users).forEach(user => {
+                    if (!user || typeof user !== 'object') return;
+                    delete user.pin;
+                    delete user.faceIdCredentialId;
+                    delete user.role;
+                });
+
+                const backup = {
+                    app: 'HabitPulse',
+                    formatVersion: 1,
+                    exportedAt: new Date().toISOString(),
+                    note: 'Copia de datos locales. No contiene PIN, contraseñas ni credenciales Face ID.',
+                    store: safeStore
+                };
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                const date = new Date().toISOString().slice(0, 10);
+                link.href = url;
+                link.download = 'habitpulse-backup-' + date + '.json';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                showToast('Copia de seguridad descargada ✅', 'emerald');
+            } catch (error) {
+                console.error('HabitPulse backup export failed:', error);
+                showToast('No se ha podido crear la copia. Revisa el espacio disponible.', 'rose');
+            }
         }
 
         function handleChangePassword(e) {
